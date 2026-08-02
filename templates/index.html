@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Research Agent</title>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/static/favicon.png" type="image/png" sizes="128x128">
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    /* 流式输出进度条 */
+    .stream-progress {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stream-step {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      background: var(--surface, #f3f4f6);
+      color: var(--muted, #6b7280);
+      transition: all 0.3s;
+    }
+    .stream-step.active {
+      background: var(--primary, #2563eb);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 0 12px rgba(37,99,235,0.3);
+    }
+
+    /* 流式文本输出框 */
+    .stream-output {
+      white-space: pre-wrap;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      padding: 14px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      border-radius: 10px;
+      margin-top: 12px;
+      max-height: 420px;
+      overflow-y: auto;
+      line-height: 1.6;
+      border: 1px solid #313244;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ========== HEADER ========== -->
+    <header>
+      <h1>Market Research Agent</h1>
+      <p class="subtitle">基于 LangGraph Workflow + RAG 的智能研报分析与生成系统</p>
+    </header>
+
+    <!-- ========== 配置区 ========== -->
+    <section class="panel config-panel">
+      <div class="config-row">
+        <div class="config-item">
+          <label for="modelMode">模型选择</label>
+          <select id="modelMode">
+            <option value="cloud">云端 DeepSeek</option>
+            <option value="local">本地 Ollama（qwen:7b）</option>
+          </select>
+        </div>
+        <div class="config-item">
+          <label>联网模式</label>
+          <div class="radio-group" id="webModeGroup">
+            <label class="radio-label" title="仅使用上传的PDF文档，禁止联网搜索">
+              <input type="radio" name="webMode" value="disabled" checked />
+              <span>📄 仅 PDF</span>
+            </label>
+            <label class="radio-label" title="使用PDF文档 + 联网搜索补充信息">
+              <input type="radio" name="webMode" value="auto" />
+              <span>🌐 PDF + 联网</span>
+            </label>
+            <label class="radio-label" title="仅使用联网搜索，不使用PDF文档">
+              <input type="radio" name="webMode" value="enabled" />
+              <span>🔍 纯联网</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 输入区 ========== -->
+    <section class="panel input-panel">
+      <label for="pdfFile">📄 上传研究报告 (PDF)</label>
+      <input type="file" id="pdfFile" accept=".pdf" />
+        <div style="margin-top:12px;">
+        <label for="taskInput">分析任务</label>
+        <textarea id="taskInput" placeholder="例如：分析这份关于2024年全球AI芯片市场的报告，总结市场规模、竞争格局和技术趋势&#10;&#10;💡 提示：输入「禁止联网」「仅用PDF原文」可锁定纯文档模式，系统将自动跳过联网搜索" rows="3"></textarea>
+        </div>
+      <button id="runBtn">🚀 开始分析</button>
+    </section>
+
+    <!-- ========== 结果区 ========== -->
+    <section class="panel results-panel">
+      <div class="summary-card">
+        <h2>📋 执行计划</h2>
+        <ul id="planList"></ul>
+      </div>
+      <div class="summary-card report-card">
+        <h2>📊 分析报告</h2>
+        <div id="reportDisplay"></div>
+        <pre id="reportOutput" style="display:none;">等待执行...</pre>
+        <button id="downloadPdfBtn" class="download-btn" disabled>下载 PDF 报告</button>
+        </div>
+    </section>
+
+    <!-- ========== 事实核查 ========== -->
+    <section class="panel factcheck-panel" id="factcheckPanel" style="display:none;">
+      <h2>🔎 事实核查报告</h2>
+      <div id="factcheckOutput"></div>
+    </section>
+
+  </div>
+
+  <script src="/static/app.js?v=4"></script>
+</body>
+</html>
+
