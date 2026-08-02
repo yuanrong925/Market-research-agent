@@ -1,0 +1,17 @@
+import { f as fallback } from './async-D55cHugf.js';
+import { c as spread_props, f as attr_class, e as ensure_array_like, i as stringify, d as bind_props } from './index-6p4UEISu.js';
+import { O as Os } from './2-DQcH4kU_.js';
+import { G } from './Block-DFkF8ric.js';
+import { s as ss } from './index3-CiV5UCJA.js';
+import { e as escape_html } from './escaping-CBnpiEl5.js';
+import './context-CBkBucIx.js';
+import './index5-BoOEKc6P.js';
+import './dev-fallback-Bc5Ork7Y.js';
+import './index-Cg-Pg6j3.js';
+import './IconButton-DoTLxBZ_.js';
+import './Clear-D7Yjckqz.js';
+
+function y(m,i){m.component(s=>{let o=i.json,f=fallback(i.depth,1/0),h=fallback(i._cur,0),a=fallback(i._last,true),c=[],l=false,u=["",""],v=false;function e(p){return p===null?"null":typeof p}function j(p){return JSON.stringify(p)}function b(p){switch(e(p)){case "function":return "f () {...}";case "symbol":return p.toString();default:return j(p)}}if(c=e(o)==="object"?Object.keys(o):[],l=Array.isArray(o),u=l?["[","]"]:["{","}"],v=f<h,!c.length)s.push("<!--[-->"),s.push(`<span${attr_class("_jsonBkt empty svelte-143228c",void 0,{isArray:l})}>${escape_html(u[0])}${escape_html(u[1])}</span>`),a?s.push("<!--[!-->"):(s.push("<!--[-->"),s.push('<span class="_jsonSep svelte-143228c">,</span>')),s.push("<!--]-->");else {if(s.push("<!--[!-->"),v)s.push("<!--[-->"),s.push(`<span${attr_class("_jsonBkt svelte-143228c",void 0,{isArray:l})} role="button" tabindex="0">${escape_html(u[0])}...${escape_html(u[1])}</span>`),!a&&v?(s.push("<!--[-->"),s.push('<span class="_jsonSep svelte-143228c">,</span>')):s.push("<!--[!-->"),s.push("<!--]-->");else {s.push("<!--[!-->"),s.push(`<span${attr_class("_jsonBkt svelte-143228c",void 0,{isArray:l})} role="button" tabindex="0">${escape_html(u[0])}</span> <ul class="_jsonList svelte-143228c"><!--[-->`);const p=ensure_array_like(c);for(let n=0,g=p.length;n<g;n++){let _=p[n];s.push("<li>"),l?s.push("<!--[!-->"):(s.push("<!--[-->"),s.push(`<span class="_jsonKey svelte-143228c">${escape_html(j(_))}</span><span class="_jsonSep svelte-143228c">:</span>`)),s.push("<!--]--> "),e(o[_])==="object"?(s.push("<!--[-->"),y(s,{json:o[_],depth:f,_cur:h+1,_last:n===c.length-1}),s.push("<!---->")):(s.push("<!--[!-->"),s.push(`<span${attr_class(`_jsonVal ${stringify(e(o[_]))}`,"svelte-143228c")}>${escape_html(b(o[_]))}</span>`),n<c.length-1?(s.push("<!--[-->"),s.push('<span class="_jsonSep svelte-143228c">,</span>')):s.push("<!--[!-->"),s.push("<!--]-->")),s.push("<!--]--></li>");}s.push(`<!--]--></ul> <span${attr_class("_jsonBkt svelte-143228c",void 0,{isArray:l})} role="button" tabindex="0">${escape_html(u[1])}</span>`),a?s.push("<!--[!-->"):(s.push("<!--[-->"),s.push('<span class="_jsonSep svelte-143228c">,</span>')),s.push("<!--]-->");}s.push("<!--]-->");}s.push("<!--]-->"),bind_props(i,{json:o,depth:f,_cur:h,_last:a});});}function L(m,i){m.component(s=>{const{$$slots:o,$$events:f,...h}=i,a=new Os(h);a.watch_for_change(),G(s,{visible:a.shared.visible,elem_id:a.shared.elem_id,elem_classes:a.shared.elem_classes,container:true,scale:a.shared.scale,min_width:a.shared.min_width,children:l=>{a.shared.loading_status?(l.push("<!--[-->"),ss(l,spread_props([{autoscroll:a.shared.autoscroll,i18n:a.i18n},a.shared.loading_status,{on_clear_status:()=>a.dispatch("clear_status",a.shared.loading_status)}]))):l.push("<!--[!-->"),l.push("<!--]--> "),y(l,{json:a.props.value}),l.push("<!---->");},$$slots:{default:true}});});}
+
+export { L as default };
+//# sourceMappingURL=Index39-BGylo3V9.js.map

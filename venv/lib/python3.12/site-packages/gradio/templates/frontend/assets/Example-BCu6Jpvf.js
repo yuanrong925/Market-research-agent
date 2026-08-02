@@ -1,0 +1,1 @@
+import{p as d,b as f}from"./i18n-DhLovEFo.js";import{t as v,a as c,R as m,U as i,Q as o,T as u}from"./index-9Ev7iYt6.js";var p=m("<div> </div>");function y(l,e){let s=d(e,"selected",3,!1);var t=p();let a;var r=o(t,!0);u(t),v(()=>{a=f(t,1,"svelte-9pg6fh",null,a,{table:e.type==="table",gallery:e.type==="gallery",selected:s()}),i(r,e.value?e.value:"")}),c(l,t)}export{y as default};
