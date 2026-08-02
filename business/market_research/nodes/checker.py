@@ -16,6 +16,7 @@ from core.utils.logger import get_logger
 
 from business.market_research.state import AgentState
 from business.market_research.fact_checker import fact_check_report, rewrite_with_fixes
+from business.market_research.utils.constants import PDF_ONLY_RULE
 from business.market_research.utils.material_utils import (
     grade_issues,
     count_evidence_items,
@@ -38,6 +39,23 @@ def fact_checker_node(state: AgentState):
     retry_count = state.get("retry_count", 0)
     model_mode = state.get("model_mode", "cloud")
 
+    # ===== 检测 pdf_only 模式 =====
+    manual_mode = state.get("manual_web_search_mode", "auto").lower()
+    pdf_only = manual_mode in ("disabled", "pdf_only")
+
+    # ===== 【关键加固】节点入口强制拦截 =====
+    # pdf_only 模式下：保留核查逻辑，但完全禁用联网校验，仅用已有PDF素材交叉验证
+    # 即使 LLM 输出中出现了网络相关资料，也以 PDF 素材为准进行核查，
+    # 不引入、不依赖任何文档以外的外部信息进行校验
+    if pdf_only:
+        logger.info("   [FactChecker] 检测到仅 PDF 模式，强制约束：")
+        logger.info(f"   {PDF_ONLY_RULE.strip()}")
+        # 强制过滤：只保留 PDF 来源的素材用于核查
+        pdf_only_chunks = [c for c in top_k_chunks if c.get("source_type") == "pdf"]
+        if pdf_only_chunks:
+            all_research = "\n\n".join([c.get("text", "") for c in pdf_only_chunks])
+            logger.info(f"   [FactChecker] 仅使用 {len(pdf_only_chunks)} 条 PDF 素材进行核查")
+
     materials_text = all_research
     if not materials_text and top_k_chunks:
         materials_text = "\n\n".join([c.get("text", "") for c in top_k_chunks])
@@ -55,7 +73,7 @@ def fact_checker_node(state: AgentState):
 
     # Step 1: 执行事实核查
     report_str = json.dumps(report, ensure_ascii=False) if not isinstance(report, str) else report
-    passed, issues_raw = fact_check_report(report_str, materials_text, model_mode)
+    passed, issues_raw = fact_check_report(report_str, materials_text, model_mode, pdf_only=pdf_only)
 
     # Step 2: 错误分级标注
     graded_issues = grade_issues(issues_raw, report)
@@ -101,7 +119,7 @@ def fact_checker_node(state: AgentState):
     # Step 5: 执行修正
     if severity_level == "minor":
         logger.info("   执行局部修正...")
-        rewritten_str = rewrite_with_fixes(report_str, graded_issues, materials_text, model_mode)
+        rewritten_str = rewrite_with_fixes(report_str, graded_issues, materials_text, model_mode, pdf_only=pdf_only)
         rewritten_obj = parse_json_safe(rewritten_str, report)
         return {
             "fact_check_passed": False,
@@ -112,7 +130,7 @@ def fact_checker_node(state: AgentState):
 
     elif severity_level == "moderate":
         logger.info("   执行定向重写...")
-        rewritten_str = targeted_rewrite(report_str, graded_issues, materials_text, model_mode)
+        rewritten_str = targeted_rewrite(report_str, graded_issues, materials_text, model_mode, pdf_only=pdf_only)
         rewritten_obj = parse_json_safe(rewritten_str, report)
         return {
             "fact_check_passed": False,
@@ -126,7 +144,7 @@ def fact_checker_node(state: AgentState):
         logger.warning(f"   严重错误，critical 模块占比: {critical_ratio:.1%}")
         if critical_ratio <= 0.5:
             logger.info("   执行定向重写（<=50% 模块受影响）...")
-            rewritten_str = targeted_rewrite(report_str, graded_issues, materials_text, model_mode)
+            rewritten_str = targeted_rewrite(report_str, graded_issues, materials_text, model_mode, pdf_only=pdf_only)
             rewritten_obj = parse_json_safe(rewritten_str, report)
             return {
                 "fact_check_passed": False,
