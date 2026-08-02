@@ -10,6 +10,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from core.utils.logger import get_logger
+from business.market_research.utils.constants import PDF_ONLY_RULE
 
 logger = get_logger(__name__)
 
@@ -18,7 +19,7 @@ CONFIDENCE_PDF = 0.9      # 内部保密文档
 CONFIDENCE_WEB = 0.6      # 外网公开资讯
 
 
-def build_citation_metadata(source_materials: List[Dict]) -> List[Dict]:
+def build_citation_metadata(source_materials: List[Dict], pdf_only: bool = False) -> List[Dict]:
     """
     为检索结果中的每一条素材生成标准化引用元数据。
 
@@ -57,19 +58,27 @@ def build_citation_metadata(source_materials: List[Dict]) -> List[Dict]:
         trust_tier = item.get("trust_tier", "unverified")
         text = item.get("text", "")[:200]  # 仅取前200字作为摘要
 
+        # ===== 【关键加固】强制覆盖 — 优先级高于 LLM 输出内容 =====
+        # pdf_only 模式下，强制将所有来源类型修改为 pdf，并清除网络引用信息
+        # 即使 LLM 输出中写了"网络资料"，代码层面也直接强制改写标签为【文档资料】
+        # 这是双层兜底：防止模型无视提示词强行输出网络来源文本
+        effective_source_type = source_type
+        if pdf_only:
+            effective_source_type = "pdf"
+
         # 基础结构
         entry: Dict[str, Any] = {
             "ref_id": ref_counter,
-            "source_type": source_type,
+            "source_type": effective_source_type,
             "doc_name": "",
             "page_num": 0,
             "url": "",
             "snippet": text,
-            "confidence_weight": CONFIDENCE_PDF if source_type == "pdf" else CONFIDENCE_WEB,
+            "confidence_weight": CONFIDENCE_PDF if effective_source_type == "pdf" else CONFIDENCE_WEB,
             "trust_tier": trust_tier,
         }
 
-        if source_type == "pdf":
+        if effective_source_type == "pdf":
             # 尝试从 metadata 中提取文档名和页码
             metadata = item.get("metadata", {}) or {}
             if isinstance(metadata, dict):
@@ -78,6 +87,9 @@ def build_citation_metadata(source_materials: List[Dict]) -> List[Dict]:
             else:
                 entry["doc_name"] = "内部文档"
             entry["confidence_weight"] = CONFIDENCE_PDF
+            # pdf_only 模式下，即使来源是 web，也强制清除 url
+            if pdf_only:
+                entry["url"] = ""
 
         elif source_type == "web":
             entry["url"] = item.get("source_url", "")
@@ -96,6 +108,7 @@ def detect_conflicts(
     pdf_materials: List[Dict],
     web_materials: List[Dict],
     citation_metadata: List[Dict],
+    pdf_only: bool = False,
 ) -> List[Dict]:
     """
     检测 PDF 与网络来源之间的信息冲突。
@@ -122,6 +135,10 @@ def detect_conflicts(
       ]
     """
     conflicts = []
+
+    # pdf_only 模式下跳过冲突检测（所有来源都是文档资料，无需检测）
+    if pdf_only:
+        return conflicts
 
     if not pdf_materials or not web_materials:
         return conflicts
@@ -170,7 +187,7 @@ def detect_conflicts(
     return conflicts
 
 
-def generate_references_section(citation_metadata: List[Dict]) -> str:
+def generate_references_section(citation_metadata: List[Dict], pdf_only: bool = False) -> str:
     """
     生成文末参考文献清单（Markdown格式）。
 
@@ -195,13 +212,19 @@ def generate_references_section(citation_metadata: List[Dict]) -> str:
             page_num = cit.get("page_num", 0)
             page_str = f"，第{page_num}页" if page_num else ""
             lines.append(
-                f"[{ref_id}] 📄【内部文档信息】{doc_name}{page_str} — {snippet}..."
+                f"[{ref_id}] 📄【文档资料】{doc_name}{page_str} — {snippet}..."
             )
-        elif source_type == "web":
+        elif source_type == "web" and not pdf_only:
             url = cit.get("url", "")
             url_display = url if url else "（无链接）"
             lines.append(
                 f"[{ref_id}] 🌐【公开网络信息】{url_display} — {snippet}..."
+            )
+        elif source_type == "web" and pdf_only:
+            # pdf_only 模式下，web 来源按文档资料显示
+            doc_name = cit.get("doc_name", "内部文档")
+            lines.append(
+                f"[{ref_id}] 📄【文档资料】{doc_name} — {snippet}..."
             )
         else:
             lines.append(f"[{ref_id}] {snippet}...")

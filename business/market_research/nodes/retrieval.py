@@ -307,13 +307,15 @@ def retrieval_node(state: AgentState):
     # ============================================================
     #  【信源溯源改造】生成引用元数据
     # ============================================================
-    citation_metadata = build_citation_metadata(source_materials)
+    # pdf_only 模式下传递模式标记给 citation_manager
+    pdf_only = mode == "pdf_only"
+    citation_metadata = build_citation_metadata(source_materials, pdf_only=pdf_only)
     logger.info(f"   [Retrieval] 生成 {len(citation_metadata)} 条引用元数据")
 
     # 初步检测冲突（仅当同时有 PDF 和 Web 来源时）
     conflict_alerts = []
     if hybrid_results and web_results:
-        conflict_alerts = detect_conflicts(hybrid_results, web_results, citation_metadata)
+        conflict_alerts = detect_conflicts(hybrid_results, web_results, citation_metadata, pdf_only=pdf_only)
         if conflict_alerts:
             conflict_count = len([c for c in conflict_alerts if c.get("status") == "conflict"])
             logger.warning(f"   [Retrieval] 检测到 {conflict_count} 处信息冲突")

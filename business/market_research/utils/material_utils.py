@@ -10,6 +10,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from core.llm.provider import get_llm
 from core.config import get_config
 from core.utils.logger import get_logger
+from business.market_research.utils.constants import PDF_ONLY_REWRITE_RULE
 
 logger = get_logger(__name__)
 
@@ -241,11 +242,15 @@ def targeted_rewrite(
     issues: List[Dict[str, str]],
     research_materials: str,
     model_mode: str,
+    pdf_only: bool = False,
 ) -> str:
     """定向重写：仅重写有问题的模块"""
     from core.utils.llm_utils import extract_llm_content
 
     llm = get_llm(temperature=0.2, model_mode=model_mode)
+
+    # pdf_only 模式下追加强约束（使用全局常量）
+    pdf_only_rule = PDF_ONLY_REWRITE_RULE if pdf_only else ""
 
     critical_issues = [i for i in issues if i.get("impact") == "critical"]
     minor_issues = [i for i in issues if i.get("impact") == "minor"]
@@ -267,6 +272,7 @@ def targeted_rewrite(
     prompt = ChatPromptTemplate.from_template(
         "你是一个专业的报告修正人。下面是一份报告，经事实核查发现了一些问题。\n"
         "请仅修改有问题的部分，保留其他内容完全不变。\n\n"
+        "{pdf_only_rule}\n"
         "原始报告（JSON 格式）：\n{report}\n\n"
         "调研素材：\n{research}\n\n"
         "需要修改的问题：\n{issues}\n\n"
@@ -284,6 +290,7 @@ def targeted_rewrite(
         "research": research_materials[:8000],
         "issues": issues_text,
         "drop": drop_text,
+        "pdf_only_rule": pdf_only_rule,
     })
 
     return extract_llm_content(response)

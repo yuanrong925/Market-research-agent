@@ -28,6 +28,7 @@ from business.market_research.utils.citation_manager import (
     generate_conflict_alerts_section,
 )
 from business.market_research.utils.material_utils import classify_trust_tier
+from business.market_research.utils.constants import PDF_ONLY_WRITER_CONSTRAINT
 
 logger = get_logger(__name__)
 
@@ -37,6 +38,7 @@ def _prepare_material_with_citations(
     source_materials: List[Dict],
     citation_metadata: List[Dict],
     conflict_alerts: List[Dict],
+    pdf_only: bool = False,
 ) -> str:
     """
     构建带引用编号的素材文本，供 Writer LLM 使用。
@@ -80,13 +82,19 @@ def _prepare_material_with_citations(
         if i < len(citation_metadata):
             cit = citation_metadata[i]
             confidence = cit.get("confidence_weight", 0.6)
-            if source_type == "pdf":
+
+            # pdf_only 模式下，所有来源统一显示为文档资料
+            effective_source_type = source_type
+            if pdf_only:
+                effective_source_type = "pdf"
+
+            if effective_source_type == "pdf":
                 doc_name = cit.get("doc_name", "内部文档")
                 page_num = cit.get("page_num", 0)
                 page_str = f"，第{page_num}页" if page_num else ""
                 confidence_label = "高置信度" if confidence >= 0.9 else "中置信度"
                 cit_info = (
-                    f"📄【内部文档信息】{doc_name}{page_str} | "
+                    f"📄【文档资料】{doc_name}{page_str} | "
                     f"置信权重: {confidence} ({confidence_label})"
                 )
             elif source_type == "web":
@@ -152,6 +160,12 @@ def writer_node(state: AgentState):
     model_mode = state.get("model_mode", "cloud")
     conflict_alerts = state.get("conflict_alerts", [])
 
+    # ===== 检测 pdf_only 模式 =====
+    manual_mode = state.get("manual_web_search_mode", "auto").lower()
+    pdf_only = manual_mode in ("disabled", "pdf_only")
+    if pdf_only:
+        logger.info("   [Writer] 检测到仅 PDF 模式，将追加约束：所有来源只能标记为文档资料")
+
     logger.info("✍️ [Writer] 开始受限写作...")
     logger.info(f"   [Writer] 大纲章节: {len(outline)}, 素材数: {len(top_k_chunks)}")
     _writer_start = __import__("time").time()
@@ -159,7 +173,7 @@ def writer_node(state: AgentState):
     # Step 1: 生成/获取引用元数据
     citation_metadata = state.get("citation_metadata", [])
     if not citation_metadata and source_materials:
-        citation_metadata = build_citation_metadata(source_materials)
+        citation_metadata = build_citation_metadata(source_materials, pdf_only=pdf_only)
         logger.info(f"   [Writer] 生成 {len(citation_metadata)} 条引用元数据")
 
     # Step 2: 检测冲突（如果尚未检测）
@@ -167,13 +181,13 @@ def writer_node(state: AgentState):
         pdf_materials = [c for c in top_k_chunks if c.get("source_type") == "pdf"]
         web_materials = [c for c in top_k_chunks if c.get("source_type") == "web"]
         if pdf_materials and web_materials:
-            conflict_alerts = detect_conflicts(pdf_materials, web_materials, citation_metadata)
+            conflict_alerts = detect_conflicts(pdf_materials, web_materials, citation_metadata, pdf_only=pdf_only)
             if conflict_alerts:
                 logger.warning(f"   ⚠️ [Writer] 检测到 {len(conflict_alerts)} 处信息冲突")
 
     # Step 3: 构建带引用编号的素材文本
     material_text = _prepare_material_with_citations(
-        top_k_chunks, source_materials, citation_metadata, conflict_alerts
+        top_k_chunks, source_materials, citation_metadata, conflict_alerts, pdf_only=pdf_only
     )
 
     # Step 4: 构建大纲文本
@@ -222,6 +236,9 @@ def writer_node(state: AgentState):
     citation_context += "- 置信权重: 0.9=高(内部文档), 0.6=中(外网资讯)\n"
     citation_context += "\n在报告正文中使用 [1][2] 格式角标引用，文末参考文献由系统自动生成，无需手动添加。\n"
 
+        # pdf_only 模式下追加来源标注约束（使用全局常量）
+    pdf_only_constraint = f"\n\n{PDF_ONLY_WRITER_CONSTRAINT}" if pdf_only else ""
+
     prompt = [
         SystemMessage(content=system_prompt),
         HumanMessage(
@@ -234,6 +251,7 @@ def writer_node(state: AgentState):
                 f"{data_conflict_report}"
                 f"{conflict_context}"
                 f"{citation_context}"
+                f"{pdf_only_constraint}"
                 f"\n请严格按照大纲结构撰写研报。"
             )
         ),
@@ -254,7 +272,7 @@ def writer_node(state: AgentState):
         report = {"标题": task, "摘要": "报告生成失败，请重试", "关键发现": []}
 
     # Step 7: 生成参考文献清单
-    references_section = generate_references_section(citation_metadata)
+    references_section = generate_references_section(citation_metadata, pdf_only=pdf_only)
 
     # Step 8: 生成冲突预警章节
     conflict_alerts_section = generate_conflict_alerts_section(conflict_alerts)
@@ -284,27 +302,31 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
     model_mode = state.get("model_mode", "cloud")
     conflict_alerts = state.get("conflict_alerts", [])
 
+    # ===== 检测 pdf_only 模式 =====
+    manual_mode = state.get("manual_web_search_mode", "auto").lower()
+    pdf_only = manual_mode in ("disabled", "pdf_only")
+
     yield f"data: {json.dumps({'step': 'writer_start', 'msg': '✍️ 开始撰写研报...'})}\n\n"
     await asyncio.sleep(0.05)
 
     # Step 1: 生成引用元数据
     citation_metadata = state.get("citation_metadata", [])
     if not citation_metadata and source_materials:
-        citation_metadata = build_citation_metadata(source_materials)
+        citation_metadata = build_citation_metadata(source_materials, pdf_only=pdf_only)
 
     # Step 2: 检测冲突
     if not conflict_alerts and len(top_k_chunks) > 0:
         pdf_materials = [c for c in top_k_chunks if c.get("source_type") == "pdf"]
         web_materials = [c for c in top_k_chunks if c.get("source_type") == "web"]
         if pdf_materials and web_materials:
-            conflict_alerts = detect_conflicts(pdf_materials, web_materials, citation_metadata)
+            conflict_alerts = detect_conflicts(pdf_materials, web_materials, citation_metadata, pdf_only=pdf_only)
             if conflict_alerts:
                 yield f"data: {json.dumps({'step': 'writer_conflict', 'msg': f'⚠️ 检测到 {len(conflict_alerts)} 处信息冲突', 'conflict_alerts': conflict_alerts})}\n\n"
                 await asyncio.sleep(0.1)
 
     # Step 3: 构建素材文本
     material_text = _prepare_material_with_citations(
-        top_k_chunks, source_materials, citation_metadata, conflict_alerts
+        top_k_chunks, source_materials, citation_metadata, conflict_alerts, pdf_only=pdf_only
     )
     outline_text = _build_outline_text(outline)
 
@@ -343,6 +365,9 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
         "在报告正文中使用 [1][2] 格式角标引用，文末参考文献由系统自动生成。\n"
     )
 
+    # pdf_only 模式下追加来源标注约束（使用全局常量）
+    pdf_only_constraint = f"\n\n{PDF_ONLY_WRITER_CONSTRAINT}" if pdf_only else ""
+
     prompt = [
         SystemMessage(content=system_prompt),
         HumanMessage(
@@ -353,6 +378,7 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
                 f"【引用素材】\n\n{material_text}\n"
                 f"{data_conflict_report}"
                 f"{conflict_context}{citation_context}"
+                f"{pdf_only_constraint}"
                 f"\n请严格按照大纲结构撰写研报。"
             )
         ),
@@ -380,7 +406,7 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
         report = {"标题": task, "摘要": "报告生成失败，请重试", "关键发现": []}
 
     # Step 6: 生成参考文献和冲突预警
-    references_section = generate_references_section(citation_metadata)
+    references_section = generate_references_section(citation_metadata, pdf_only=pdf_only)
     conflict_alerts_section = generate_conflict_alerts_section(conflict_alerts)
 
     result = {

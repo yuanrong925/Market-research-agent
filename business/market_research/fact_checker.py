@@ -13,6 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from core.llm.provider import get_llm
 from core.utils.logger import get_logger
+from business.market_research.utils.constants import PDF_ONLY_CHECKER_RULE, PDF_ONLY_REWRITE_RULE
 
 logger = get_logger(__name__)
 
@@ -21,6 +22,7 @@ def fact_check_report(
     report: str,
     research_materials: str,
     model_mode: str = "cloud",
+    pdf_only: bool = False,
 ) -> Tuple[bool, List[Dict[str, str]]]:
     """
     事实核查 + 证据锚点验证
@@ -38,7 +40,7 @@ def fact_check_report(
 
     all_issues = []
     for chunk in chunks:
-        issues = _check_chunk_with_anchors(chunk, research_materials, llm)
+        issues = _check_chunk_with_anchors(chunk, research_materials, llm, pdf_only=pdf_only)
         all_issues.extend(issues)
 
     # 证据锚点二次验证
@@ -94,10 +96,14 @@ def _check_chunk_with_anchors(
     report_chunk: str,
     research_materials: str,
     llm: Any,
+    pdf_only: bool = False,
 ) -> List[Dict[str, str]]:
     """核查报告中的一个块（含证据锚点要求）"""
     if len(report_chunk) > 7000:
         report_chunk = report_chunk[:4000] + "\n\n...(中间省略)...\n\n" + report_chunk[-3000:]
+
+    # pdf_only 模式下追加强约束：所有分析内容只能基于上传 PDF 文档，禁止引入任何文档以外的互联网信息
+    pdf_only_rule = PDF_ONLY_CHECKER_RULE if pdf_only else ""
 
     prompt = ChatPromptTemplate.from_template(
         "你是一个严谨的事实核查员。请检查下面这段报告中的每一个事实性论断。\n\n"
@@ -105,6 +111,7 @@ def _check_chunk_with_anchors(
         "1. 每个论断必须在调研素材中有**原文支撑**（evidence anchor）\n"
         "2. 如果报告标注了引用链接 [标题](url)，检查该链接是否在调研素材中出现\n"
         "3. 数据、百分比、排名等必须有素材对应\n\n"
+        "{pdf_only_rule}\n"
         "调研素材：\n{research}\n\n"
         "待核查报告内容：\n{chunk}\n\n"
         "请输出 JSON 格式结果（不要带 markdown 代码块标记）：\n"
@@ -127,7 +134,7 @@ def _check_chunk_with_anchors(
     )
 
     chain = prompt | llm
-    response = chain.invoke({"research": research_materials[:8000], "chunk": report_chunk})
+    response = chain.invoke({"research": research_materials[:8000], "chunk": report_chunk, "pdf_only_rule": pdf_only_rule})
 
     content = _extract_llm_content(response)
     issues = []
@@ -189,12 +196,16 @@ def rewrite_with_fixes(
     issues: List[Dict[str, str]],
     research_materials: str,
     model_mode: str = "cloud",
+    pdf_only: bool = False,
 ) -> str:
     """根据事实核查结果重写报告，丢弃无锚点的条目"""
     if not issues:
         return report
 
     llm = get_llm(temperature=0.2, model_mode=model_mode)
+
+    # pdf_only 模式下追加强约束（使用全局常量）
+    pdf_only_rule = PDF_ONLY_REWRITE_RULE if pdf_only else ""
 
     drop_sentences = []
     keep_issues = []
@@ -217,6 +228,7 @@ def rewrite_with_fixes(
     prompt = ChatPromptTemplate.from_template(
         "你是一个专业的报告撰写人。下面是一份报告，经事实核查发现了一些问题。\n"
         "请根据调研素材和修改建议重写。\n\n"
+        "{pdf_only_rule}\n"
         "原始报告：\n{report}\n\n"
         "调研素材：\n{research}\n\n"
         "需要修改的问题：\n{issues}\n\n"
@@ -234,6 +246,7 @@ def rewrite_with_fixes(
         "research": research_materials[:8000],
         "issues": issues_text,
         "drop": drop_text,
+        "pdf_only_rule": pdf_only_rule,
     })
 
     return _extract_llm_content(response)
