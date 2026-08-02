@@ -48,7 +48,7 @@ async def run_research(
     task: str = Form(...),
     pdf_file: Optional[UploadFile] = File(None),
     model_mode: str = Form("cloud"),
-    web_search_mode: str = Form("auto"),
+    manual_web_search_mode: str = Form("auto"),
 ):
     """
     执行市场调研 SOP 流程。
@@ -57,7 +57,7 @@ async def run_research(
       task: 研究任务描述
       pdf_file: 上传的 PDF 文件（可选）
       model_mode: 模型模式（cloud/local）
-      web_search_mode: 搜索模式（auto/enabled/disabled）
+      manual_web_search_mode: 搜索模式（auto/enabled/disabled）
     """
     # 保存 PDF 文件
     pdf_path = ""
@@ -77,7 +77,7 @@ async def run_research(
         task=task,
         pdf_path=pdf_path,
         model_mode=model_mode,
-        manual_web_search_mode=web_search_mode,
+        manual_web_search_mode=manual_web_search_mode,
     )
 
     # 执行工作流
@@ -106,7 +106,7 @@ async def run_research_stream(
     task: str = Form(...),
     pdf_file: Optional[UploadFile] = File(None),
     model_mode: str = Form("cloud"),
-    web_search_mode: str = Form("auto"),
+    manual_web_search_mode: str = Form("auto"),
 ):
     """
     流式执行市场调研 SOP 流程。
@@ -128,7 +128,7 @@ async def run_research_stream(
             task=task,
             pdf_path=pdf_path,
             model_mode=model_mode,
-            manual_web_search_mode=web_search_mode,
+            manual_web_search_mode=manual_web_search_mode,
             session_id=session_id,
         ):
             yield event

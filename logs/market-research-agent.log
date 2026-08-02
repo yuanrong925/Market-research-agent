@@ -1,0 +1,409 @@
+2026-08-02 12:33:14 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 12:33:14 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 12:33:42 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 12:33:42 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 12:33:43 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 12:33:44 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 12:33:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 6 个子任务, 耗时: 7.96s
+2026-08-02 12:33:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 扫地机器人行业市场规模、增长率及历史发展概况...
+2026-08-02 12:33:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 扫地机器人竞争格局、主要厂商及市场份额分析...
+2026-08-02 12:33:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 扫地机器人技术路线、产品功能及创新趋势总结...
+2026-08-02 12:33:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 扫地机器人产业链、供应链及成本结构概述...
+2026-08-02 12:33:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=3 | pdf_only | 扫地机器人消费者需求、用户画像及市场渗透率分析...
+2026-08-02 12:33:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [6] p=4 | pdf_only | 扫地机器人行业政策环境、发展趋势及未来预测总结...
+2026-08-02 12:33:51 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 12:33:52 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 12:33:52 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 12:33:52 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 12:33:52 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 12:33:52 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 12:33:53 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 12:33:53 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 12:33:53 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 12:34:19 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 13:07:33 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 13:07:33 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 13:08:01 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 13:08:01 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 13:08:01 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 13:08:02 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 13:08:11 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 5 个子任务, 耗时: 10.46s
+2026-08-02 13:08:11 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 扫地机器人行业概况及市场规模信息梳理...
+2026-08-02 13:08:11 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 扫地机器人竞争格局及主要企业信息梳理...
+2026-08-02 13:08:11 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 扫地机器人核心技术及产品功能信息梳理...
+2026-08-02 13:08:11 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 扫地机器人消费者需求与市场趋势信息梳理...
+2026-08-02 13:08:11 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=4 | pdf_only | 扫地机器人产业链、供应链及政策环境信息梳理...
+2026-08-02 13:08:11 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 13:08:13 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 13:08:13 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 13:08:13 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 13:08:13 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 13:08:13 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 13:08:14 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 13:08:14 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 13:08:14 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 13:09:45 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 13:10:48 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:45 | 🔎 [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 13:10:48 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 13:10:48 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 13:12:37 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:60 |    📊 核查结果: 5 个问题, 4 个 critical, 错误率 25.0%
+2026-08-02 13:12:37 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:64 |    🏷️ 严重等级: severe, 动作: rewrite
+2026-08-02 13:12:37 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:118 |    🔧 严重错误，critical 模块占比: 33.3%
+2026-08-02 13:12:37 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:120 |    🔧 执行定向重写（≤50% 模块受影响）...
+2026-08-02 13:12:37 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=False
+2026-08-02 13:12:37 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 13:13:48 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:45 | 🔎 [FactChecker] 开始事实核查 (第 2 轮)...
+2026-08-02 13:13:48 | DEBUG | -            | core.llm.provider | get_llm:148 | [LLM] 缓存命中: cloud:deepseek:0.1
+2026-08-02 13:14:25 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:60 |    📊 核查结果: 0 个问题, 0 个 critical, 错误率 0.0%
+2026-08-02 13:14:25 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:64 |    🏷️ 严重等级: passed, 动作: none
+2026-08-02 13:14:25 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:67 |    ✅ 研报通过所有核查！
+2026-08-02 14:24:17 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 14:24:17 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 14:24:49 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 14:24:49 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 14:24:50 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 14:24:50 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 14:24:56 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 5 个子任务, 耗时: 7.45s
+2026-08-02 14:24:56 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 扫地机器人行业市场规模、增长趋势及发展历程...
+2026-08-02 14:24:56 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 扫地机器人主要厂商、品牌竞争格局及市场份额...
+2026-08-02 14:24:56 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 扫地机器人关键技术路线、产品功能与性能参数...
+2026-08-02 14:24:56 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 扫地机器人消费者需求、用户画像及渗透率分析...
+2026-08-02 14:24:56 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=3 | pdf_only | 扫地机器人行业未来趋势、智能化方向及发展预测...
+2026-08-02 14:24:56 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 14:24:58 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 14:24:58 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 14:24:59 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 14:24:59 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 14:24:59 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 14:26:08 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 14:28:45 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:45 | 🔎 [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 14:28:45 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 14:28:45 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 14:30:38 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:60 |    📊 核查结果: 3 个问题, 3 个 critical, 错误率 11.1%
+2026-08-02 14:30:38 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:64 |    🏷️ 严重等级: severe, 动作: rewrite
+2026-08-02 14:30:38 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:118 |    🔧 严重错误，critical 模块占比: 60.0%
+2026-08-02 14:30:38 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:130 |    🔧 执行整篇重写（>50% 模块受影响），重新规划大纲...
+2026-08-02 14:30:38 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:45 | 🔎 [FactChecker] 开始事实核查 (第 2 轮)...
+2026-08-02 14:30:38 | DEBUG | -            | core.llm.provider | get_llm:148 | [LLM] 缓存命中: cloud:deepseek:0.1
+2026-08-02 14:31:36 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:60 |    📊 核查结果: 1 个问题, 1 个 critical, 错误率 3.7%
+2026-08-02 14:31:36 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:64 |    🏷️ 严重等级: severe, 动作: rewrite
+2026-08-02 14:31:36 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:118 |    🔧 严重错误，critical 模块占比: 20.0%
+2026-08-02 14:31:36 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:120 |    🔧 执行定向重写（≤50% 模块受影响）...
+2026-08-02 14:31:36 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=False
+2026-08-02 14:31:36 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 14:32:01 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:45 | 🔎 [FactChecker] 开始事实核查 (第 3 轮)...
+2026-08-02 14:32:01 | DEBUG | -            | core.llm.provider | get_llm:148 | [LLM] 缓存命中: cloud:deepseek:0.1
+2026-08-02 14:34:34 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:60 |    📊 核查结果: 0 个问题, 0 个 critical, 错误率 0.0%
+2026-08-02 14:34:34 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:64 |    🏷️ 严重等级: passed, 动作: none
+2026-08-02 14:34:34 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:67 |    ✅ 研报通过所有核查！
+2026-08-02 14:53:51 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 14:53:51 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:07:41 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:07:41 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:09:14 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:09:14 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:10:09 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 15:10:09 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 15:10:10 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 15:10:11 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 15:10:19 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 4 个子任务, 耗时: 9.70s
+2026-08-02 15:10:19 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 扫地机器人行业市场规模与增长趋势（包括全球及国内销量、销售额、渗透率等）...
+2026-08-02 15:10:19 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 扫地机器人行业竞争格局与主要品牌市场份额分析（含厂商排名、产品线布局）...
+2026-08-02 15:10:19 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 扫地机器人产品技术发展路线与关键功能迭代（如导航、避障、自清洁等）...
+2026-08-02 15:10:19 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 扫地机器人消费者需求特征与未来市场趋势判断...
+2026-08-02 15:10:19 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 15:10:21 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 15:10:21 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 15:10:21 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 15:10:21 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 15:10:21 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 15:10:22 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 15:10:22 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 15:10:22 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 15:11:23 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 15:12:00 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:54 | [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 15:12:00 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 15:12:00 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 15:13:32 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:68 |    核查结果: 5 个问题, 5 个 critical, 错误率 27.8%
+2026-08-02 15:13:32 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:72 |    严重等级: severe, 动作: rewrite
+2026-08-02 15:13:32 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:126 |    严重错误，critical 模块占比: 0.0%
+2026-08-02 15:13:32 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:128 |    执行定向重写（<=50% 模块受影响）...
+2026-08-02 15:13:32 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=False
+2026-08-02 15:13:32 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 15:13:45 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:47 |    [短文档快捷] 素材较短 (1757 字符)，跳过后续核查轮次
+2026-08-02 15:19:46 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:19:46 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:21:42 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 15:21:42 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 15:21:43 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 15:21:43 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 15:21:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 5 个子任务, 耗时: 7.73s
+2026-08-02 15:21:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 扫地机器人行业市场规模、增速及发展历程梳理...
+2026-08-02 15:21:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 扫地机器人主要品牌厂商及竞争格局分析...
+2026-08-02 15:21:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 扫地机器人核心技术、产品功能及价格带分布总结...
+2026-08-02 15:21:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 扫地机器人消费者需求、用户画像及购买偏好归纳...
+2026-08-02 15:21:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=4 | pdf_only | 扫地机器人行业渠道结构、供应链特点及未来趋势提炼...
+2026-08-02 15:21:50 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 15:21:51 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 15:21:51 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 15:21:52 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 15:21:52 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 15:21:52 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 15:21:52 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 15:21:52 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 15:21:52 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 15:22:17 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 15:22:56 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:54 | [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 15:22:56 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 15:22:56 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 15:22:57 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:68 |    核查结果: 0 个问题, 0 个 critical, 错误率 0.0%
+2026-08-02 15:22:57 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:72 |    严重等级: passed, 动作: none
+2026-08-02 15:22:57 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:75 |    研报通过所有核查！
+2026-08-02 15:25:13 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:25:13 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:25:39 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 15:25:39 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 15:25:39 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 15:25:39 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 15:25:47 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 5 个子任务, 耗时: 7.97s
+2026-08-02 15:25:47 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 文档中关于扫地机器人行业市场规模、发展历程与技术演进的基础背景信息...
+2026-08-02 15:25:47 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 文档中关于扫地机器人行业主要品牌、厂商及竞争格局的分析...
+2026-08-02 15:25:47 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 文档中关于扫地机器人产品功能、技术路线及关键参数对比的信息...
+2026-08-02 15:25:47 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 文档中关于扫地机器人上下游供应链、成本结构及渠道模式的信息...
+2026-08-02 15:25:47 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=3 | pdf_only | 文档中关于扫地机器人行业政策法规、未来趋势与市场预测的信息...
+2026-08-02 15:25:47 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 15:25:48 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 15:25:48 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 15:25:48 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 15:25:48 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 15:25:59 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 15:31:01 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:54 | [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 15:31:01 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 15:31:01 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 15:31:07 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:68 |    核查结果: 0 个问题, 0 个 critical, 错误率 0.0%
+2026-08-02 15:31:07 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:72 |    严重等级: passed, 动作: none
+2026-08-02 15:31:07 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:75 |    研报通过所有核查！
+2026-08-02 15:46:59 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:46:59 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 15:47:19 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 15:47:19 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 15:47:20 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 15:47:20 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 6 个子任务, 耗时: 16.98s
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 扫地机器人行业整体市场规模、增速及发展历程概述...
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 扫地机器人主要品牌厂商、市场竞争格局与份额分布...
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 扫地机器人核心技术、产品功能迭代与技术创新点...
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 扫地机器人消费者需求特征、用户画像与价格带分析...
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=3 | pdf_only | 扫地机器人上下游产业链结构及关键环节分析...
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [6] p=4 | pdf_only | 扫地机器人行业相关政策标准与未来发展趋势判断...
+2026-08-02 15:47:36 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 15:47:39 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 15:47:39 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 15:47:39 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 15:47:39 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 15:47:39 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 15:47:40 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 15:47:40 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 15:47:40 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 15:47:52 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 15:49:14 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:54 | [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 15:49:14 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 15:49:14 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 15:49:51 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:68 |    核查结果: 0 个问题, 0 个 critical, 错误率 0.0%
+2026-08-02 15:49:51 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:72 |    严重等级: passed, 动作: none
+2026-08-02 15:49:51 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:75 |    研报通过所有核查！
+2026-08-02 16:00:10 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:00:10 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:00:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 16:00:50 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器人行业的全部信息...
+2026-08-02 16:00:51 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 16:00:52 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 16:00:57 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 5 个子任务, 耗时: 6.78s
+2026-08-02 16:00:57 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 扫地机器人行业市场规模、增长率及发展历程概述...
+2026-08-02 16:00:57 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 扫地机器人主要厂商、市场份额及竞争格局分析...
+2026-08-02 16:00:57 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 扫地机器人核心技术、产品功能及技术发展趋势...
+2026-08-02 16:00:57 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 扫地机器人消费者需求、用户画像及市场渗透情况...
+2026-08-02 16:00:57 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=4 | pdf_only | 扫地机器人产业链上下游及供应链情况...
+2026-08-02 16:00:57 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 16:00:59 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 16:00:59 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 16:00:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_only
+2026-08-02 16:00:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器人行业的全部信息... 有PDF=True
+2026-08-02 16:00:59 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:211 |    📄 [模式:仅PDF] 有PDF → 只检索文档，禁止联网
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '小文档：相对排序优先，通过', 'score': 0.4}
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 4 条 (PDF: 4, 网页: 0)
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:287 |    [Retrieval] 纯 PDF 模式，跳过 LLM 重排，按分数排序取 Top-4
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 4 条引用元数据
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 4 条引用元数据
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 4 条
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 16:01:00 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 16:01:00 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 16:01:00 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 16:01:15 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 16:01:58 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:54 | [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 16:01:58 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 16:01:58 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 16:02:37 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:68 |    核查结果: 0 个问题, 0 个 critical, 错误率 0.0%
+2026-08-02 16:02:37 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:72 |    严重等级: passed, 动作: none
+2026-08-02 16:02:37 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:75 |    研报通过所有核查！
+2026-08-02 16:03:03 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=False
+2026-08-02 16:03:03 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 16:34:44 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:34:44 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:37:08 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:37:08 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:44:01 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:44:01 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:45:17 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:45:17 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:50:14 | INFO  | -            | agents.providers.search | get_search_provider:249 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:50:15 | INFO  | -            | core.search.provider | get_search_provider:250 | [Search] 创建新实例 provider=tavily
+2026-08-02 16:50:37 | INFO  | -            | business.market_research.nodes.planning | plan_node:50 | 📋 [PlanNode] 开始拆解调研需求...
+2026-08-02 16:50:37 | INFO  | -            | business.market_research.nodes.planning | plan_node:51 |    [PlanNode] 原始需求: 总结这份文档里关于扫地机器行业的全部信息...
+2026-08-02 16:50:37 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.3, streaming=False
+2026-08-02 16:50:38 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.3
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.planning | plan_node:84 |    ✅ [PlanNode] 拆解完成: 6 个子任务, 耗时: 9.15s
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [1] p=1 | pdf_only | 文档中关于扫地机器人行业市场规模、增长率及发展历程的概述...
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [2] p=2 | pdf_only | 文档中关于扫地机器人主要品牌、厂商及竞争格局的描述...
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [3] p=2 | pdf_only | 文档中关于扫地机器人核心技术、产品功能与创新趋势的说明...
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [4] p=3 | pdf_only | 文档中关于扫地机器人产业链、供应链及成本结构的分析...
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [5] p=3 | pdf_only | 文档中关于扫地机器人消费者需求、渗透率及市场偏好的数据...
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.planning | plan_node:86 |        [6] p=4 | pdf_only | 文档中关于扫地机器人行业未来趋势、机遇与挑战的总结...
+2026-08-02 16:50:46 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:111 | 📄 [Ingestion] 开始数据摄入...
+2026-08-02 16:50:48 | INFO  | -            | core.retrieval.hybrid | build_index:151 |    📊 BM25 索引构建完成: 4 篇文档
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.ingestion | data_ingestion_node:135 |    ✅ 数据摄入完成: 4 个文本块
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:189 | 🔍 [Retrieval] 开始精准检索与降噪... 模式=pdf_web
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:190 |    查询: 总结这份文档里关于扫地机器行业的全部信息... 有PDF=True
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:228 |    🌐 [模式:PDF+联网] 有PDF → PDF检索 + 强制联网（双渠道合并）
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:125 |    [Retrieval] PDF 检索召回: 4 条
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:126 |    [Retrieval] 向量相似度 top-3: ['0.000', '0.000', '0.000']
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_pdf_retrieval:127 |    [Retrieval] BM25 得分 top-3:  ['0.000', '0.000', '0.000']
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_web_search:141 |    🌐 启动联网搜索...
+2026-08-02 16:50:48 | INFO  | -            | business.market_research.nodes.retrieval | _execute_web_search:144 |    🔎 搜索轮次 1/2: 总结这份文档里关于扫地机器行业的全部信息...
+2026-08-02 16:50:48 | DEBUG | -            | core.search.provider | get_search_provider:237 | [Search] 缓存命中: search:tavily
+2026-08-02 16:50:52 | INFO  | -            | core.search.provider | search:92 | [Search] Tavily 搜索: 总结这份文档里关于扫地机器行业的全部信息... max_results=5, 耗时=3.08s
+2026-08-02 16:50:52 | INFO  | -            | business.market_research.nodes.retrieval | _execute_web_search:164 |       获得 5 条, 累积 5 条
+2026-08-02 16:50:52 | INFO  | -            | business.market_research.nodes.retrieval | _execute_web_search:173 |    🌐 联网搜索最终: 5 条（已过滤低质）
+2026-08-02 16:50:52 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:258 |    📋 信息充足性评估（仅参考）: {'sufficient': True, 'reason': '素材充足 (rerank=0.500)', 'score': 0.9}
+2026-08-02 16:50:52 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:262 |    📦 合并候选池: 9 条 (PDF: 4, 网页: 5)
+2026-08-02 16:50:52 | INFO  | -            | agents.providers.llm | _create_deepseek_llm:52 |    🚀 创建 DeepSeek LLM: model=deepseek-chat, temperature=0.1, streaming=False
+2026-08-02 16:50:52 | INFO  | -            | agents.providers.llm | get_llm:186 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:273 |    [Retrieval] Rerank 过滤: 输入 9 条, 输出 Top-8 条
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:277 |    [Retrieval] Rerank 最高分: 3.00, 最低分: 2.00
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.utils.citation_manager | build_citation_metadata:91 | 📝 [CitationManager] 生成 8 条引用元数据
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.nodes.retrieval | retrieval_node:311 |    [Retrieval] 生成 8 条引用元数据
+2026-08-02 16:50:54 | WARNING | -            | business.market_research.utils.citation_manager | detect_conflicts:164 | ⚠️ [CitationManager] 检测到 4 处信息冲突
+2026-08-02 16:50:54 | WARNING | -            | business.market_research.utils.citation_manager | detect_conflicts:166 |    🔴 冲突: 同比 | PDF: ...行业在经历前两年的销量下滑后，迎来显著回 暖，呈现出“量价齐升”的积极态势。  市场规模与增... | Web: ...中国扫地机器人销售渠道及消费 IDC最新发布的《全球家用智能清扫机器人市场跟踪报告》等系列报告...
+2026-08-02 16:50:54 | WARNING | -            | business.market_research.utils.citation_manager | detect_conflicts:166 |    🔴 冲突: 2022 | PDF: ...集发布新品维持市场竞争力。科沃斯和添可的海外业务 收入均实现显著增长，海外收入占比接近40%。... | Web: ...%为8亿元；2020年科沃斯恢复427%增长至5亿元，石头科技增长60%至12亿元；2021年...
+2026-08-02 16:50:54 | WARNING | -            | business.market_research.utils.citation_manager | detect_conflicts:166 |    🔴 冲突: 2024 | PDF: ... 技术落地瑕疵：如机械臂结构可能存在的下压力不足、算法导致 的预留盲区等“暗坑”，要求厂商在追... | Web: ...时海外有结构提升空间。 行业竞争格局：静态看，石头、科沃斯、追觅相对领先，小米占据低端、云鲸中...
+2026-08-02 16:50:54 | WARNING | -            | business.market_research.utils.citation_manager | detect_conflicts:166 |    🔴 冲突: 202 | PDF: ... 技术落地瑕疵：如机械臂结构可能存在的下压力不足、算法导致 的预留盲区等“暗坑”，要求厂商在追... | Web: 1 证券研究报告 作者： 行业评级： 上次评级： 行业报告： 请务必阅读正文之后的信息披露和免责申明...
+2026-08-02 16:50:54 | WARNING | -            | business.market_research.nodes.retrieval | retrieval_node:319 |    [Retrieval] 检测到 4 处信息冲突
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:290 | 🔎 [数据冲突检测] 开始检查多源数据一致性...
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:291 |    素材总数: 8 条
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:297 |    PDF: 0 条, Web: 0 条
+2026-08-02 16:50:54 | INFO  | -            | business.market_research.nodes.conflict_checker | data_conflict_checker_node:301 |    ✅ 仅单一来源，无需冲突检测
+2026-08-02 16:50:55 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=True
+2026-08-02 16:50:55 | INFO  | -            | core.llm.provider | get_llm_streaming:187 | [LLM] 创建新流式实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 16:51:15 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 16:51:37 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:54 | [FactChecker] 开始事实核查 (第 1 轮)...
+2026-08-02 16:51:37 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.1, streaming=False
+2026-08-02 16:51:37 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.1
+2026-08-02 16:52:56 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:68 |    核查结果: 2 个问题, 1 个 critical, 错误率 200.0%
+2026-08-02 16:52:56 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:72 |    严重等级: severe, 动作: rewrite
+2026-08-02 16:52:56 | WARNING | -            | business.market_research.nodes.checker | fact_checker_node:126 |    严重错误，critical 模块占比: 0.0%
+2026-08-02 16:52:56 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:128 |    执行定向重写（<=50% 模块受影响）...
+2026-08-02 16:52:56 | INFO  | -            | core.llm.provider | _create_deepseek_llm:48 |    🚀 创建 DeepSeek LLM: model=deepseek-v4-flash, temperature=0.2, streaming=False
+2026-08-02 16:52:56 | INFO  | -            | core.llm.provider | get_llm:158 | [LLM] 创建新实例: mode=cloud, provider=deepseek, temperature=0.2
+2026-08-02 16:53:12 | INFO  | -            | business.market_research.graph.streaming | execute_streaming_workflow:261 |    🔄 [FactChecker] 需要整篇重写，重新 Analyst + Writer...
+2026-08-02 16:53:12 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 16:54:51 | DEBUG | -            | core.llm.provider | get_llm_streaming:177 | [LLM] 流式缓存命中: cloud:deepseek:0.2:streaming
+2026-08-02 16:55:54 | INFO  | -            | business.market_research.nodes.checker | fact_checker_node:47 |    [短文档快捷] 素材较短 (4965 字符)，跳过后续核查轮次
