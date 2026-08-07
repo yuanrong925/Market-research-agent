@@ -163,21 +163,18 @@ def _llm_rerank_structured(
 
     scored_results = []
     for i, candidate in enumerate(candidates):
+        # 修复：复制原始 dict，保留所有字段（source_url, cleaned_chunks, cleaned_full_text, trust_tier 等）
+        result = dict(candidate)
         text = candidate.get("text", "")[:800]
-        source_index = candidate.get("source_index", i)
-        metadata = candidate.get("metadata", {})
         label = label_map.get(i, "不相关")
         rank_weight = label_weight.get(label, 1)
 
-        scored_results.append({
-            "text": text,
-            "score": candidate.get("score", 0.5),
-            "rerank_score": rank_weight,
-            "relevance_label": label,
-            "source_index": source_index,
-            "metadata": metadata,
-            "source_type": "reranked",
-        })
+        result["text"] = text
+        result["rerank_score"] = rank_weight
+        result["relevance_label"] = label
+        # 保留原始 source_type（"web" / "pdf"），不覆盖为 "reranked"
+        result["source_type"] = candidate.get("source_type", "reranked")
+        scored_results.append(result)
 
     # 按权重降序排列（高度相关 > 相关 > 不相关），同权重的保持原序
     scored_results.sort(key=lambda x: x["rerank_score"], reverse=True)

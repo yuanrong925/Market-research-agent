@@ -66,81 +66,170 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div class="report-title">' + escapeHtml(reportData.title || reportData['标题']) + '</div>';
     }
 
-    // ===== 1. 调研概述 =====
-    var overview = reportData['调研概述'] || reportData.overview || '';
-    if (overview) {
-      html += '<div class="section-card">'
-        + '<div class="section-icon">📋</div>'
-        + '<div class="section-content"><div class="section-label">1. 调研概述</div>'
-        + '<div class="summary-text">' + escapeHtml(overview) + '</div></div></div>';
-    }
+    // ====== 通用章节渲染：按优先级顺序渲染所有字段 ======
+    var priorityKeys = [
+      '摘要', '执行摘要', '研究背景', '调研概述',
+      '行业现状', '市场规模', '竞争格局',
+      '产品与价格趋势', '商业模式',
+      '行业挑战与风险', '总结与展望',
+      '总结', '结论', '建议', '引用来源',
+      '竞品分析', '机会与风险', '信息来源附录',
+    ];
 
-    // ===== 2. 行业现状 =====
-    var industry = reportData['行业现状'] || reportData.industry_status || '';
-    if (industry) {
-      html += '<div class="section-card">'
-        + '<div class="section-icon">🏭</div>'
-        + '<div class="section-content"><div class="section-label">2. 行业现状</div>'
-        + '<p class="bg-text">' + escapeHtml(industry) + '</p></div></div>';
+    var allKeys = Object.keys(reportData);
+    var orderedKeys = [];
+    for (var pi = 0; pi < priorityKeys.length; pi++) {
+      if (reportData[priorityKeys[pi]] !== undefined) {
+        orderedKeys.push(priorityKeys[pi]);
+      }
     }
-
-    // ===== 3. 竞品分析 =====
-    var competitors = reportData['竞品分析'] || reportData.competitor_analysis || [];
-    if (competitors.length > 0) {
-      html += '<div class="section-header">3. 竞品分析</div>';
-      for (var i = 0; i < competitors.length; i++) {
-        var c = competitors[i];
-        var name = c['竞品名称'] || c.name || '竞品 ' + (i + 1);
-        var analysis = c['分析'] || c.analysis || '';
-        html += '<div class="finding-card">'
-          + '<div class="finding-number">' + (i + 1) + '</div>'
-          + '<div class="finding-body">'
-          + '<div class="finding-topic">' + escapeHtml(name) + '</div>'
-          + '<div class="finding-detail">' + escapeHtml(analysis) + '</div></div></div>';
+    for (var ki = 0; ki < allKeys.length; ki++) {
+      if (orderedKeys.indexOf(allKeys[ki]) === -1 && allKeys[ki] !== '标题' && allKeys[ki] !== 'title') {
+        orderedKeys.push(allKeys[ki]);
       }
     }
 
-    // ===== 4. 机会与风险 =====
-    var oppRisk = reportData['机会与风险'] || reportData.opportunities_and_risks || {};
-    var opportunities = oppRisk['机会'] || oppRisk.opportunities || [];
-    var risks = oppRisk['风险'] || oppRisk.risks || [];
-    if (opportunities.length > 0 || risks.length > 0) {
-      html += '<div class="section-header">4. 机会与风险</div>';
-      if (opportunities.length > 0) {
-        html += '<div style="margin-bottom:8px;"><strong>🟢 机会</strong></div><div class="conclusion-list">';
-        for (var i = 0; i < opportunities.length; i++) {
-          if (opportunities[i]) {
-            html += '<div class="conclusion-item"><span class="conclusion-check">✓</span>' + escapeHtml(opportunities[i]) + '</div>';
+    // 将 Markdown 文本转为 HTML
+    // 将 Markdown 文本转为 HTML（支持完整 Markdown 语法 + 数据差异蓝色提示）
+    function renderMarkdown(text) {
+      if (!text) return '';
+      // 检测数据差异提示 → 整体包裹蓝色样式
+      var hasDiscrepancy = /\u26a0\ufe0f\u3010\u5f85\u4eba\u5de5\u786e\u8ba4\u3011/.test(text);
+      var wrapBlue = '';
+      var wrapBlueEnd = '';
+      if (hasDiscrepancy) {
+        wrapBlue = '<div style="color:#2563eb;background:#eff6ff;padding:8px 12px;border-radius:6px;border-left:3px solid #2563eb;margin:4px 0;">';
+        wrapBlueEnd = '</div>';
+      }
+      // 先转义 HTML 实体
+      var escaped = escapeHtml(text);
+      // 将 Markdown 语法转换为 HTML 标签
+      // 行内代码：\`code\` → <code>code</code>
+      escaped = escaped.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
+      // 加粗：**text** → <strong>text</strong>
+      escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // 斜体：*text* → <em>text</em>
+      escaped = escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      // 链接：[text](url) → <a href="url" target="_blank">text</a>
+      escaped = escaped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      // 图片：![alt](url) → <img src="url" alt="alt" />
+      escaped = escaped.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;height:auto;" />');
+      // 删除线：~~text~~ → <del>text</del>
+      escaped = escaped.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+      // 按行处理
+      var lines = ('' + escaped).split('\n');
+      var result = '';
+      var inList = false;
+      for (var li = 0; li < lines.length; li++) {
+        var line = lines[li];
+        var trimmed = line.trim();
+        if (!trimmed) {
+          if (inList) { result += '</ul>'; inList = false; }
+          if (!hasDiscrepancy) result += '<br>';
+          continue;
+        }
+        // 中文编号章节标题：一、市场发展现状（深蓝 h4）
+        var cnHMatch = trimmed.match(/^([一二三四五六七八九十]+)[、.．]\\s*(.*)/);
+        if (cnHMatch) {
+          if (inList) { result += '</ul>'; inList = false; }
+          result += '<h4 style="margin:14px 0 6px 0;font-size:15px;color:#1e40af;">' + cnHMatch[1] + '、' + cnHMatch[2] + '</h4>';
+          continue;
+        }
+        // 数字编号子标题：1.1 全球市场规模与增长（浅蓝 h5）
+        var numHMatch = trimmed.match(/^(\\d+\\.\\d+)\\s+(.*)/);
+        if (numHMatch) {
+          if (inList) { result += '</ul>'; inList = false; }
+          result += '<h5 style="margin:10px 0 4px 0;font-size:14px;color:#2563eb;">' + numHMatch[1] + ' ' + numHMatch[2] + '</h5>';
+          continue;
+        }
+        // Markdown 标题
+        var hMatch = trimmed.match(/^(#{1,3})\\s+(.*)/);
+        if (hMatch) {
+          if (inList) { result += '</ul>'; inList = false; }
+          var hLevel = hMatch[1].length;
+          var hText = hMatch[2];
+          if (hLevel === 1) result += '<h3 style="margin:16px 0 8px 0;font-size:16px;color:#1e40af;">' + hText + '</h3>';
+          else if (hLevel === 2) result += '<h4 style="margin:12px 0 6px 0;font-size:15px;color:#2563eb;">' + hText + '</h4>';
+          else result += '<h5 style="margin:10px 0 4px 0;font-size:14px;color:#3b82f6;">' + hText + '</h5>';
+          continue;
+        }
+        // 列表项
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          if (!inList) { result += '<ul style="margin:4px 0;padding-left:20px;">'; inList = true; }
+          result += '<li style="margin:2px 0;line-height:1.6;">' + trimmed.substring(2) + '</li>';
+          continue;
+        }
+        // 普通段落
+        if (inList) { result += '</ul>'; inList = false; }
+        result += '<p style="margin:4px 0;line-height:1.8;">' + trimmed + '</p>';
+      }
+      if (inList) result += '</ul>';
+      // 如果有差异提示，包裹蓝色容器
+      if (hasDiscrepancy) {
+        result = wrapBlue + result + wrapBlueEnd;
+      }
+      return result;
+    }
+
+    for (var i = 0; i < orderedKeys.length; i++) {
+      var key = orderedKeys[i];
+      var value = reportData[key];
+      if (value === undefined || value === null || value === '') continue;
+
+      // 渲染章节标题
+      html += '<div class="section-card">';
+      html += '<div class="section-icon">📄</div>';
+      html += '<div class="section-content">';
+      html += '<div class="section-label">' + escapeHtml(key) + '</div>';
+
+      // 根据值类型渲染
+      if (typeof value === 'string') {
+        html += '<div class="summary-text">' + renderMarkdown(value) + '</div>';
+      } else if (Array.isArray(value)) {
+        html += '<div class="references-list">';
+        for (var vi = 0; vi < value.length; vi++) {
+          var item = value[vi];
+          if (typeof item === 'string') {
+            html += '<div class="reference-item" style="margin:4px 0;">' + renderMarkdown(item) + '</div>';
+          } else if (typeof item === 'object' && item !== null) {
+            html += '<div class="finding-card" style="margin:6px 0;">';
+            html += '<div class="finding-number">' + (vi + 1) + '</div>';
+            html += '<div class="finding-body">';
+            for (var k in item) {
+              if (item.hasOwnProperty(k)) {
+                html += '<div class="finding-topic">' + escapeHtml(k) + '</div>';
+                html += '<div class="finding-detail">' + renderMarkdown('' + item[k]) + '</div>';
+              }
+            }
+            html += '</div></div>';
+          }
+        }
+        html += '</div>';
+      } else if (typeof value === 'object' && value !== null) {
+        html += '<div>';
+        for (var k in value) {
+          if (value.hasOwnProperty(k)) {
+            var v = value[k];
+            html += '<div style="margin:6px 0;"><strong>' + escapeHtml(k) + '：</strong>';
+            if (Array.isArray(v)) {
+              html += '<ul style="margin:4px 0;padding-left:20px;">';
+              for (var vi = 0; vi < v.length; vi++) {
+                html += '<li style="margin:2px 0;">' + escapeHtml('' + v[vi]) + '</li>';
+              }
+              html += '</ul>';
+            } else {
+              html += renderMarkdown('' + v);
+            }
+            html += '</div>';
           }
         }
         html += '</div>';
       }
-      if (risks.length > 0) {
-        html += '<div style="margin-top:8px;margin-bottom:8px;"><strong>🔴 风险</strong></div><div class="conclusion-list">';
-        for (var i = 0; i < risks.length; i++) {
-          if (risks[i]) {
-            html += '<div class="conclusion-item" style="color:#ef4444;"><span class="conclusion-check" style="color:#ef4444;">⚠</span>' + escapeHtml(risks[i]) + '</div>';
-          }
-        }
-        html += '</div>';
-      }
+
+      html += '</div></div>';
     }
 
-    // ===== 5. 信息来源附录 =====
-    var sources = reportData['信息来源附录'] || reportData.sources_appendix || [];
-    if (sources.length > 0) {
-      html += '<div class="section-header">5. 信息来源附录</div>'
-        + '<div class="references-list">';
-      for (var i = 0; i < sources.length; i++) {
-        if (sources[i]) {
-          html += '<div class="reference-item"><span class="ref-id">[' + (i + 1) + ']</span> ' + escapeHtml(sources[i]) + '</div>';
-        }
-      }
-      html += '</div>';
-    }
-
-        if (reportDisplay) reportDisplay.innerHTML = html;
-    // 隐藏原始 JSON 输出
+    if (reportDisplay) reportDisplay.innerHTML = html;
     if (reportOut) reportOut.style.display = 'none';
   }
   function renderFactCheck(issues) {
@@ -343,6 +432,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'pdf_generating': '📑 正在生成 PDF 报告...',
         'done': '🎉 全部分析完成！',
         'error': '❌ 出错了',
+        'early_terminate': '⏹️ 检索无有效信息，分析已提前终止',
         'intent_override': '🔔 意图识别兜底生效'
       };
 
@@ -387,7 +477,31 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           }
 
-          // 意图识别兜底通知 → 显示通知横幅，更新模式指示器
+          // 早停事件（检索后子任务全部不相关/文档无数据，直接截停）
+          if (step === 'early_terminate') {
+            if (streamOutput) {
+              allStreamedText += '\n⏹️ ' + (event.msg || '检索未发现有效信息，自动停止分析') + '\n';
+              if (event.info_limitation_note) {
+                allStreamedText += '\n💡 建议：' + event.info_limitation_note + '\n';
+              }
+              streamOutput.textContent = allStreamedText;
+              streamOutput.style.color = '#f59e0b';
+            }
+            if (stepBar) stepBar.textContent = '⏹️ 检索无有效信息，分析已提前终止';
+            // 显示错误提示卡片
+            if (reportDisplay) {
+              reportDisplay.innerHTML = '<div class="empty-state" style="text-align:center;padding:40px;border:2px dashed #f59e0b;border-radius:12px;">'
+                + '<div style="font-size:48px;margin-bottom:16px;">⏹️</div>'
+                + '<div style="font-size:18px;font-weight:600;color:#f59e0b;margin-bottom:8px;">分析已提前终止</div>'
+                + '<div style="font-size:14px;color:var(--muted);max-width:400px;margin:0 auto;">'
+                + escapeHtml(event.msg || '检索未发现有效信息') + '</div>'
+                + (event.info_limitation_note ? '<div style="font-size:13px;color:var(--muted);margin-top:12px;padding:8px 12px;background:#fefce8;border-radius:6px;">💡 ' + escapeHtml(event.info_limitation_note) + '</div>' : '')
+                + '</div>';
+            }
+            if (streamOutput) streamOutput.style.display = 'none';
+          }
+
+          // 意图识别兜底通知 → 显示通知横幅，弹出二选一确认框
           if (step === 'intent_override' && event.notification) {
             var modeIndicator = document.getElementById('modeIndicator');
             if (modeIndicator) {
@@ -399,6 +513,26 @@ document.addEventListener('DOMContentLoaded', function () {
               allStreamedText += '\n🔔 ' + event.notification + '\n';
               streamOutput.textContent = allStreamedText;
               streamOutput.scrollTop = streamOutput.scrollHeight;
+            }
+            // 弹出二选一确认框：用户确认是否切换为仅PDF模式
+            if (event.suggest_switch && event.new_mode === 'disabled') {
+              var userChoice = confirm('检测到您的需求偏向仅基于文档内容分析。\n\n是否切换至【仅PDF】模式（关闭联网，仅使用文档信息）？\n\n点击「确定」切换为仅PDF模式\n点击「取消」保持当前模式继续');
+              if (userChoice) {
+                // 用户确认切换 → 重新发起请求（标记为pdf_only模式）
+                // 由于当前请求已经在执行中，我们标记请求需要重启
+                if (streamOutput) {
+                  allStreamedText += '\n🔄 正在切换至【仅PDF】模式，重新分析...\n';
+                  streamOutput.textContent = allStreamedText;
+                }
+                // 设置标志，让后续代码重启请求
+                window._intentSwitchConfirmed = true;
+                window._intentSwitchNewMode = 'disabled';
+              } else {
+                if (streamOutput) {
+                  allStreamedText += '\n✅ 保持当前模式继续分析\n';
+                  streamOutput.textContent = allStreamedText;
+                }
+              }
             }
           }
 

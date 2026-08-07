@@ -101,16 +101,19 @@ def _build_material_text(
 def analyst_node(state: AgentState):
     """
     分析与规划节点（SOP 第三阶段）
+
+    注意：v2 改为只读 source_materials，不再依赖 top_k_chunks。
+    素材池在 chunk_validation 中已锁死（material_pool_frozen=True）。
     """
     task = state["task"]
-    top_k_chunks = state.get("top_k_chunks", [])
+    source_materials = state.get("source_materials", [])  # v2: 只读 source_materials
     citation_metadata = state.get("citation_metadata", [])
     conflict_alerts = state.get("conflict_alerts", [])
 
-    logger.info("🧠 [Analyst] 开始分析与规划...")
-    logger.info(f"   [Analyst] 输入素材数: {len(top_k_chunks)} 条")
+    logger.info("🧠 [Analyst] 开始分析与规划（只读 source_materials）...")
+    logger.info(f"   [Analyst] 输入素材数: {len(source_materials)} 条")
     _analyst_start = __import__("time").time()
-    material_text = _build_material_text(top_k_chunks, citation_metadata, conflict_alerts)
+    material_text = _build_material_text(source_materials, citation_metadata, conflict_alerts)
 
     llm = get_llm(temperature=0.2, model_mode=state.get("model_mode"))
 
@@ -181,20 +184,22 @@ def analyst_node(state: AgentState):
 async def streaming_analyst_node(state: AgentState) -> AsyncGenerator[str, None]:
     """
     流式 Analyst 节点：异步生成大纲 JSON，实时 yield 进度事件。
+
+    注意：v2 改为只读 source_materials，不再依赖 top_k_chunks。
     """
     task = state["task"]
-    top_k_chunks = state.get("top_k_chunks", [])
+    source_materials = state.get("source_materials", [])  # v2: 只读 source_materials
     citation_metadata = state.get("citation_metadata", [])
     conflict_alerts = state.get("conflict_alerts", [])
-    top_k_chunks = [
+    source_materials = [
         c if isinstance(c, dict) else {"text": str(c), "source_index": i}
-        for i, c in enumerate(top_k_chunks)
+        for i, c in enumerate(source_materials)
     ]
 
-    yield f"data: {json.dumps({'step': 'analyst_start', 'msg': '开始分析规划...'})}\n\n"
+    yield f"data: {json.dumps({'step': 'analyst_start', 'msg': '开始分析规划（只读 source_materials）...'})}\n\n"
     await asyncio.sleep(0.05)
 
-    material_text = _build_material_text(top_k_chunks, citation_metadata, conflict_alerts)
+    material_text = _build_material_text(source_materials, citation_metadata, conflict_alerts)
 
     llm = get_llm_streaming(temperature=0.2, model_mode=state.get("model_mode"))
 

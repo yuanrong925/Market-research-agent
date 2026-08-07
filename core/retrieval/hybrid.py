@@ -59,7 +59,7 @@ class BM25Retriever:
             total_len += len(terms)
             all_terms.update(freq.keys())
 
-        self.avg_doc_len = total_len / max(self.doc_count, 1)
+        self.avg_doc_len = total_len / max(self.doc_count, 1) if self.doc_count > 0 else 1.0
 
         term_doc_count = Counter()
         for freq in self.doc_freqs:
@@ -174,6 +174,8 @@ class HybridRetriever:
             {
                 "text": item["text"],
                 "score": item["score"],
+                "vector_score": item.get("vector_score", 0.0),
+                "bm25_score": item.get("bm25_score", 0.0),
                 "metadata": item.get("metadata", {}),
                 "source_index": item.get("source_index", -1),
                 "source_type": "hybrid",
@@ -188,8 +190,13 @@ class HybridRetriever:
         if self.chroma_collection:
             try:
                 col = self.chroma_collection
+                # 兼容包装过的 collection（dict 包装）
                 if isinstance(col, dict):
-                    col = col.get("collection", col)
+                    col = col.get("collection")
+                # 如果 col 是 None（包装结构异常），跳过
+                if col is None:
+                    logger.warning(f"   ⚠️ 向量检索: chroma_collection 包装结构异常，跳过")
+                    return results
 
                 resp = col.query(
                     query_texts=[query],
@@ -209,7 +216,8 @@ class HybridRetriever:
                         if dists and isinstance(dists[0], list) and i < len(dists[0]):
                             dist = dists[0][i]
 
-                        similarity = 1.0 - dist if dist < 1.0 else 0.0
+                        # ChromaDB returns L2 distance by default; convert to similarity in [0,1]
+                        similarity = 1.0 / (1.0 + dist) if dist >= 0 else 0.0
 
                         results.append({
                             "text": doc,
@@ -232,8 +240,12 @@ class HybridRetriever:
 
         try:
             bm25_hits = self.bm25.query(query, n_results=n_results)
+
+            # 用结果集内最大分归一化 BM25 分数到 [0, 1]
+            max_bm25_score = max((s for s, _, _ in bm25_hits), default=0.0)
+
             for score, idx, text in bm25_hits:
-                norm_score = min(score / 10.0, 1.0) if score > 0 else 0.0
+                norm_score = score / max_bm25_score if max_bm25_score > 0 else 0.0
 
                 meta = {}
                 if idx < len(self.all_metadatas):
@@ -258,43 +270,56 @@ class HybridRetriever:
         vector_weight: float = 0.6,
         bm25_weight: float = 0.4,
     ) -> List[Dict[str, Any]]:
-        """融合向量和 BM25 的检索结果（加权融合 + 去重）"""
-        text_rank_map: Dict[str, Dict[str, float]] = {}
+        """融合向量和 BM25 的检索结果（加权融合 + 去重）
 
-        for rank, item in enumerate(vector_results):
-            text = item["text"]
-            if text not in text_rank_map:
-                text_rank_map[text] = {}
-            text_rank_map[text]["vector_rank"] = rank + 1
-            text_rank_map[text]["vector_score"] = item["score"]
-            text_rank_map[text]["metadata"] = item.get("metadata", {})
-            text_rank_map[text]["source_index"] = item.get("source_index", -1)
+        改用实际分数加权融合，而非 RRF 排名融合。
+        RRF 最大分仅 ~0.016，无法与 0.5/0.7 阈值配合使用。
 
-        for rank, item in enumerate(bm25_results):
+        新方案：
+          - 对每个文档，取向量分和 BM25 分的加权平均值
+          - 如果只有一种来源有分数，直接使用该分数
+          - 分数范围 0.0~1.0，与阈值系统兼容
+        """
+        text_score_map: Dict[str, Dict[str, Any]] = {}
+
+        for item in vector_results:
             text = item["text"]
-            if text not in text_rank_map:
-                text_rank_map[text] = {}
-            text_rank_map[text]["bm25_rank"] = rank + 1
-            text_rank_map[text]["bm25_score"] = item["score"]
-            text_rank_map[text].setdefault("metadata", item.get("metadata", {}))
-            text_rank_map[text].setdefault("source_index", item.get("source_index", -1))
+            if text not in text_score_map:
+                text_score_map[text] = {}
+            text_score_map[text]["vector_score"] = item.get("score", 0.0)
+            text_score_map[text]["metadata"] = item.get("metadata", {})
+            text_score_map[text]["source_index"] = item.get("source_index", -1)
+
+        for item in bm25_results:
+            text = item["text"]
+            if text not in text_score_map:
+                text_score_map[text] = {}
+            text_score_map[text]["bm25_score"] = item.get("score", 0.0)
+            text_score_map[text].setdefault("metadata", item.get("metadata", {}))
+            text_score_map[text].setdefault("source_index", item.get("source_index", -1))
 
         fused = []
-        for text, ranks in text_rank_map.items():
-            vector_rank = ranks.get("vector_rank", len(vector_results) + 1)
-            bm25_rank = ranks.get("bm25_rank", len(bm25_results) + 1)
+        for text, scores in text_score_map.items():
+            vec_score = scores.get("vector_score", None)
+            bm25_score = scores.get("bm25_score", None)
 
-            k = 60
-            rrf_score = (
-                vector_weight * (1.0 / (k + vector_rank)) +
-                bm25_weight * (1.0 / (k + bm25_rank))
-            )
+            # 融合分数：加权平均，只有一种来源时直接用该分数
+            if vec_score is not None and bm25_score is not None:
+                combined_score = vector_weight * vec_score + bm25_weight * bm25_score
+            elif vec_score is not None:
+                combined_score = vec_score
+            elif bm25_score is not None:
+                combined_score = bm25_score
+            else:
+                combined_score = 0.0
 
             fused.append({
                 "text": text,
-                "score": rrf_score,
-                "metadata": ranks.get("metadata", {}),
-                "source_index": ranks.get("source_index", -1),
+                "score": combined_score,
+                "vector_score": vec_score if vec_score is not None else 0.0,
+                "bm25_score": bm25_score if bm25_score is not None else 0.0,
+                "metadata": scores.get("metadata", {}),
+                "source_index": scores.get("source_index", -1),
                 "source_type": "hybrid",
             })
 

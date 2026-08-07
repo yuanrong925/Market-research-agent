@@ -12,7 +12,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form, Q
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from core.llm.provider import get_llm
+from core.llm.provider import get_llm, get_llm_streaming
 from core.utils.logger import get_logger
 
 from business.market_research.state import AgentState, create_initial_state
@@ -260,7 +260,7 @@ async def frontend_report_pdf(
     task: str = Form(...),
     report_text: str = Form(...),
 ):
-    """前端兼容：POST /api/report/pdf → 生成 PDF 下载（使用 reportlab 直接生成，无外部依赖）"""
+    """前端兼容：POST /api/report/pdf → 生成 PDF 下载（委托 agents/retrieval/pdf_report.py 生成）"""
     try:
         report_data = json.loads(report_text)
     except json.JSONDecodeError:
@@ -271,122 +271,8 @@ async def frontend_report_pdf(
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, f"report_{uuid.uuid4().hex}.pdf")
 
-    # 使用 reportlab 直接生成 PDF，无需 agents.retrieval.rag 依赖
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.units import mm
-
-    c = canvas.Canvas(output_path, pagesize=A4)
-    width, height = A4
-    margin = 25 * mm
-    y = height - margin
-    line_height = 5 * mm
-
-    def draw_line(text, x, y, font="Helvetica", size=10):
-        nonlocal c
-        c.setFont(font, size)
-        c.drawString(x, y, text)
-        return y - line_height
-
-    # 标题
-    title = report_data.get("title") or report_data.get("标题") or task
-    y = draw_line(title, margin, y, "Helvetica-Bold", 16)
-    y -= line_height * 2
-
-    # 1. 调研概述
-    overview = report_data.get("overview") or report_data.get("调研概述") or ""
-    if overview:
-        y = draw_line("1. 调研概述", margin, y, "Helvetica-Bold", 12)
-        y -= 2
-        words = str(overview).split()
-        line = ""
-        for word in words:
-            test = line + word + " "
-            if c.stringWidth(test, "Helvetica", 10) < width - 2 * margin:
-                line = test
-            else:
-                y = draw_line(line, margin, y, "Helvetica", 10)
-                line = word + " "
-        if line.strip():
-            y = draw_line(line, margin, y, "Helvetica", 10)
-        y -= line_height
-
-    # 2. 行业现状
-    industry = report_data.get("industry_status") or report_data.get("行业现状") or ""
-    if industry:
-        y -= line_height
-        y = draw_line("2. 行业现状", margin, y, "Helvetica-Bold", 12)
-        y -= 2
-        words = str(industry).split()
-        line = ""
-        for word in words:
-            test = line + word + " "
-            if c.stringWidth(test, "Helvetica", 10) < width - 2 * margin:
-                line = test
-            else:
-                y = draw_line(line, margin, y, "Helvetica", 10)
-                line = word + " "
-        if line.strip():
-            y = draw_line(line, margin, y, "Helvetica", 10)
-        y -= line_height
-
-    # 3. 竞品分析
-    competitors = report_data.get("competitor_analysis") or report_data.get("竞品分析") or []
-    if competitors:
-        y -= line_height
-        y = draw_line("3. 竞品分析", margin, y, "Helvetica-Bold", 12)
-        y -= 2
-        for c_item in competitors:
-            name = c_item.get("name") or c_item.get("竞品名称") or ""
-            analysis = c_item.get("analysis") or c_item.get("分析") or ""
-            if name:
-                y = draw_line(f"• {name}", margin, y, "Helvetica-Bold", 10)
-            if analysis:
-                y = draw_line(f"  {analysis}", margin + 10, y, "Helvetica", 10)
-            y -= 4
-            if y < margin:
-                c.showPage()
-                y = height - margin
-
-    # 4. 机会与风险
-    opp_risk = report_data.get("opportunities_and_risks") or report_data.get("机会与风险") or {}
-    opportunities = opp_risk.get("opportunities") or opp_risk.get("机会") or []
-    risks = opp_risk.get("risks") or opp_risk.get("风险") or []
-    if opportunities or risks:
-        y -= line_height
-        y = draw_line("4. 机会与风险", margin, y, "Helvetica-Bold", 12)
-        y -= 2
-        if opportunities:
-            y = draw_line("机会:", margin, y, "Helvetica-Bold", 10)
-            for opp in opportunities:
-                y = draw_line(f"  • {opp}", margin, y, "Helvetica", 10)
-                y -= 3
-                if y < margin:
-                    c.showPage()
-                    y = height - margin
-        if risks:
-            y = draw_line("风险:", margin, y, "Helvetica-Bold", 10)
-            for r in risks:
-                y = draw_line(f"  • {r}", margin, y, "Helvetica", 10)
-                y -= 3
-                if y < margin:
-                    c.showPage()
-                    y = height - margin
-
-    # 5. 信息来源附录
-    sources = report_data.get("sources_appendix") or report_data.get("信息来源附录") or []
-    if sources:
-        y -= line_height
-        y = draw_line("5. 信息来源附录", margin, y, "Helvetica-Bold", 12)
-        y -= 2
-        for i, ref in enumerate(sources):
-            y = draw_line(f"  [{i+1}] {ref}", margin, y, "Helvetica", 9)
-            y -= 3
-            if y < margin:
-                c.showPage()
-                y = height - margin
-
-    c.save()
+    from agents.retrieval.pdf_report import generate_frontend_pdf
+    generate_frontend_pdf(report_data, task, output_path)
 
     if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
         raise HTTPException(status_code=500, detail="PDF 生成失败")
@@ -409,8 +295,72 @@ async def frontend_followup_stream(
     question: str = Form(...),
     model_mode: str = Form("cloud"),
 ):
-    """前端兼容：POST /api/followup-stream → 转发到 follow_up_question"""
-    return await follow_up_question(
-        session_id=session_id,
-        question=question,
+    """
+    前端兼容：POST /api/followup-stream → SSE 流式推送追问回答
+
+    前端期望 SSE 事件流（data: {text: "..."}），
+    这里必须返回 StreamingResponse，不能是普通 JSON。
+    """
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+
+    # 追加用户问题
+    append_conversation(session_id, "user", question)
+
+    # 构建上下文（素材 + 历史报告 + 对话记录）
+    context = {
+        "task": session["task"],
+        "report": session["final_report"],
+        "materials": session["source_materials"],
+        "conversation": session["conversation"],
+    }
+
+    async def event_stream():
+        try:
+            # 使用流式 LLM 实例
+            llm = get_llm_streaming(temperature=0.2, model_mode=model_mode)
+            prompt = (
+                f"基于以下上下文回答用户的问题。\n\n"
+                f"原始任务：{context['task']}\n\n"
+                f"已生成的报告摘要：{json.dumps(context['report'], ensure_ascii=False)[:2000]}\n\n"
+                f"对话历史：{json.dumps(context['conversation'][-5:], ensure_ascii=False)}\n\n"
+                f"用户问题：{question}\n\n"
+                f"请基于已有信息给出回答，如果信息不足，请说明。"
+            )
+
+            accumulated = ""
+            async for chunk in llm.astream(prompt):
+                token = chunk.content if hasattr(chunk, 'content') else str(chunk)
+                if token:
+                    accumulated += token
+                    event_data = json.dumps({"text": token}, ensure_ascii=False)
+                    yield f"data: {event_data}\n\n"
+
+            # 保存完整回答到会话
+            append_conversation(session_id, "assistant", accumulated)
+
+            # 推送完成事件（前端解析 step === 'followup_done'）
+            done_data = json.dumps({
+                "step": "followup_done",
+                "answer": accumulated,
+            }, ensure_ascii=False)
+            yield f"data: {done_data}\n\n"
+
+        except Exception as e:
+            logger.error(f"[追问] 流式错误: {e}")
+            error_data = json.dumps({
+                "step": "error",
+                "msg": str(e),
+            }, ensure_ascii=False)
+            yield f"data: {error_data}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
