@@ -189,47 +189,64 @@ def detect_conflicts(
 
 def generate_references_section(citation_metadata: List[Dict], pdf_only: bool = False) -> str:
     """
-    生成文末参考文献清单（Markdown格式）。
+    生成文末【信息来源附录】（结构化引用列表格式）。
 
     参数:
       citation_metadata: 引用元数据列表
 
     返回:
-      Markdown 格式的参考文献清单
+      结构化引用列表字符串
     """
     if not citation_metadata:
         return ""
 
-    lines = ["## 参考文献\n", ""]
+    lines = ["\"信息来源附录\": [", ""]
 
     for cit in citation_metadata:
         ref_id = cit.get("ref_id", 0)
         source_type = cit.get("source_type", "unknown")
-        snippet = cit.get("snippet", "")[:80]
+        snippet = cit.get("snippet", "")[:120]
 
         if source_type == "pdf":
             doc_name = cit.get("doc_name", "内部文档")
             page_num = cit.get("page_num", 0)
             page_str = f"，第{page_num}页" if page_num else ""
+
+            # 从 snippet 中提取简洁描述（取前60字作为内容说明）
+            desc = ""
+            if snippet:
+                clean_desc = snippet.replace(doc_name, "").strip().strip("，。")
+                if clean_desc:
+                    desc = f"，{clean_desc[:60]}"
+
             lines.append(
-                f"[{ref_id}] 📄【文档资料】{doc_name}{page_str} — {snippet}..."
+                f"  \"【S{ref_id}】内部文档《{doc_name}》{page_str}{desc}\""
             )
+
         elif source_type == "web" and not pdf_only:
             url = cit.get("url", "")
             url_display = url if url else "（无链接）"
+
+            # 从 snippet 中提取标题/文章名（取前60字）
+            title = ""
+            if snippet:
+                first_sentence = snippet.split("。")[0] if "。" in snippet else snippet
+                title = f" 《{first_sentence[:60]}》"
+
             lines.append(
-                f"[{ref_id}] 🌐【公开网络信息】{url_display} — {snippet}..."
+                f"  \"【S{ref_id}】公开网络：{url_display}{title}\""
             )
+
         elif source_type == "web" and pdf_only:
-            # pdf_only 模式下，web 来源按文档资料显示
             doc_name = cit.get("doc_name", "内部文档")
             lines.append(
-                f"[{ref_id}] 📄【文档资料】{doc_name} — {snippet}..."
+                f"  \"【S{ref_id}】内部文档《{doc_name}》\""
             )
         else:
-            lines.append(f"[{ref_id}] {snippet}...")
+            lines.append(f"  \"【S{ref_id}】{snippet[:80]}...\"")
 
-        lines.append("")  # 空行分隔
+    lines.append("")
+    lines.append("]")
 
     return "\n".join(lines)
 

@@ -1,8 +1,13 @@
 """
-【市场调研专属】事实核查模块
+【市场调研专属】事实核查模块 — v3 单次调用版
 
 核心机制：「证据锚点」—— 每条论断必须在 research_materials / 原始素材
 中找到原文支撑，找不到直接判 False 并丢弃，禁止 LLM 强行编造。
+
+v3 变更：
+  1. 移除分块逻辑（_chunk_report），改为单次 LLM 调用处理整份报告
+  2. 保持证据锚点二次验证
+  3. 输入截断：报告 > 8000 字时取头尾，素材 > 10000 字时取头尾
 """
 
 import json
@@ -25,7 +30,7 @@ def fact_check_report(
     pdf_only: bool = False,
 ) -> Tuple[bool, List[Dict[str, str]]]:
     """
-    事实核查 + 证据锚点验证
+    事实核查 + 证据锚点验证（v3 单次 LLM 调用，不分块）
 
     返回 (是否通过, 问题列表)
     """
@@ -34,39 +39,17 @@ def fact_check_report(
 
     llm = get_llm(temperature=0.1, model_mode=model_mode)
 
-    max_chars = 6000
-    max_chunks = 3
-    chunks = _chunk_report(report, max_chars, max_chunks)
+    # ===== 截断超长输入避免 token 超限 =====
+    truncated_report = _truncate_text(report, 8000)
+    truncated_materials = _truncate_text(research_materials, 10000)
 
-    all_issues = []
-    for chunk in chunks:
-        issues = _check_chunk_with_anchors(chunk, research_materials, llm, pdf_only=pdf_only)
-        all_issues.extend(issues)
+    # ===== 单次 LLM 调用检查整份报告 =====
+    issues = _check_report_single_call(
+        truncated_report, truncated_materials, llm, pdf_only=pdf_only
+    )
 
-    # 证据锚点二次验证
-    filtered_issues = []
-    for issue in all_issues:
-        issue_type = issue.get("issue", "")
-        sentence = issue.get("sentence", "")
-
-        if "无来源支撑" in issue_type or "锚点不存在" in issue_type:
-            anchor = _find_evidence_anchor(sentence, research_materials)
-            if anchor:
-                continue
-            else:
-                issue["suggestion"] = "丢弃（无证据锚点）"
-                issue["issue"] = "无来源支撑（锚点不存在）"
-                filtered_issues.append(issue)
-        elif "与素材矛盾" in issue_type:
-            anchor = _find_evidence_anchor(sentence, research_materials)
-            if not anchor:
-                issue["suggestion"] = "丢弃（无法锚定矛盾证据）"
-                filtered_issues.append(issue)
-            else:
-                issue["evidence_anchor"] = anchor
-                filtered_issues.append(issue)
-        else:
-            filtered_issues.append(issue)
+    # ===== 证据锚点二次验证 =====
+    filtered_issues = _validate_evidence_anchors(issues, research_materials)
 
     severe_issues = [
         i for i in filtered_issues
@@ -86,34 +69,33 @@ def _find_evidence_anchor(sentence: str, research_materials: str) -> str:
     return _find(sentence, research_materials)
 
 
-def _chunk_report(report: str, max_chars: int, max_chunks: int) -> List[str]:
-    """将报告分块"""
-    from business.market_research.utils.evidence_matcher import chunk_report as _chunk
-    return _chunk(report, max_chars, max_chunks)
+def _truncate_text(text: str, max_chars: int) -> str:
+    """智能截断：保留头尾，中间用省略号替代"""
+    if len(text) <= max_chars:
+        return text
+    head_len = max_chars * 2 // 3
+    tail_len = max_chars - head_len - 50
+    return text[:head_len] + f"\n\n...(中间省略，共 {len(text)} 字符)...\n\n" + text[-tail_len:]
 
 
-def _check_chunk_with_anchors(
-    report_chunk: str,
+def _check_report_single_call(
+    report_text: str,
     research_materials: str,
     llm: Any,
     pdf_only: bool = False,
 ) -> List[Dict[str, str]]:
-    """核查报告中的一个块（含证据锚点要求）"""
-    if len(report_chunk) > 7000:
-        report_chunk = report_chunk[:4000] + "\n\n...(中间省略)...\n\n" + report_chunk[-3000:]
-
-    # pdf_only 模式下追加强约束：所有分析内容只能基于上传 PDF 文档，禁止引入任何文档以外的互联网信息
+    """单次 LLM 调用核查整份报告，不分块"""
     pdf_only_rule = PDF_ONLY_CHECKER_RULE if pdf_only else ""
 
     prompt = ChatPromptTemplate.from_template(
-        "你是一个严谨的事实核查员。请检查下面这段报告中的每一个事实性论断。\n\n"
+        "你是一个严谨的事实核查员。请检查下面这份完整报告中的每一个事实性论断。\n\n"
         "核查规则：\n"
         "1. 每个论断必须在调研素材中有**原文支撑**（evidence anchor）\n"
         "2. 如果报告标注了引用链接 [标题](url)，检查该链接是否在调研素材中出现\n"
         "3. 数据、百分比、排名等必须有素材对应\n\n"
         "{pdf_only_rule}\n"
         "调研素材：\n{research}\n\n"
-        "待核查报告内容：\n{chunk}\n\n"
+        "待核查完整报告：\n{chunk}\n\n"
         "请输出 JSON 格式结果（不要带 markdown 代码块标记）：\n"
         '{{\n'
         '  "issues": [\n'
@@ -134,7 +116,7 @@ def _check_chunk_with_anchors(
     )
 
     chain = prompt | llm
-    response = chain.invoke({"research": research_materials[:8000], "chunk": report_chunk, "pdf_only_rule": pdf_only_rule})
+    response = chain.invoke({"research": research_materials, "chunk": report_text, "pdf_only_rule": pdf_only_rule})
 
     content = _extract_llm_content(response)
     issues = []
@@ -153,6 +135,41 @@ def _check_chunk_with_anchors(
         pass
 
     return issues
+
+
+def _validate_evidence_anchors(
+    all_issues: List[Dict[str, str]],
+    research_materials: str,
+) -> List[Dict[str, str]]:
+    """对 LLM 返回的问题列表进行证据锚点二次验证"""
+    from business.market_research.utils.evidence_matcher import find_evidence_anchor as _find
+
+    filtered_issues = []
+    for issue in all_issues:
+        issue_type = issue.get("issue", "")
+        sentence = issue.get("sentence", "")
+
+        if "无来源支撑" in issue_type or "锚点不存在" in issue_type:
+            anchor = _find(sentence, research_materials)
+            if anchor:
+                # LLM 误判，实际有锚点 → 跳过此问题
+                continue
+            else:
+                issue["suggestion"] = "丢弃（无证据锚点）"
+                issue["issue"] = "无来源支撑（锚点不存在）"
+                filtered_issues.append(issue)
+        elif "与素材矛盾" in issue_type:
+            anchor = _find(sentence, research_materials)
+            if not anchor:
+                issue["suggestion"] = "丢弃（无法锚定矛盾证据）"
+                filtered_issues.append(issue)
+            else:
+                issue["evidence_anchor"] = anchor
+                filtered_issues.append(issue)
+        else:
+            filtered_issues.append(issue)
+
+    return filtered_issues
 
 
 def _extract_llm_content(response: Any) -> str:

@@ -30,6 +30,12 @@ class AgentState(CoreAgentState, total=False):
     cleaned_chunks: List[Dict[str, Any]]  # 清洗后的文本块
 
     # ============================================================
+    #  【新增】PDF 缓存（复用，避免重复解析+向量化）
+    # ============================================================
+    pdf_parsed_chunks: List[Dict[str, Any]]  # 缓存 PDF 解析后的文本块（子任务复用）
+    pdf_embeddings: Any                     # 缓存 PDF 向量嵌入（子任务复用，类型为 numpy.ndarray 或 None）
+
+    # ============================================================
     #  分析规划
     # ============================================================
     analyst_outline: List[Dict[str, Any]]  # 分析大纲
@@ -89,6 +95,51 @@ class AgentState(CoreAgentState, total=False):
     # }
     report_with_citations: str             # 含角标引用的完整报告文本
     references_section: str                # 文末参考文献清单
+
+
+    # ============================================================
+    #  Chunk 统一校验字段
+    # ============================================================
+    validation_stats: Dict[str, Any]                # Chunk 校验统计
+    web_cleaned_chunks: List[Dict[str, Any]]          # 网页清洗后的原始正文
+    chunks_validated: bool                            # 校验是否已完成
+    validation_retry_count: int                       # 校验后二次检索重试次数（最大2次）
+    need_revalidation: bool                           # 是否需要重新校验（二次检索后设为True）
+
+    # ============================================================
+    #  【新增】终止原因与子任务检索结果
+    # ============================================================
+    terminate_reason: str                   # 终止原因：MODEL_CONFLICT | ALL_SUB_TASKS_IRRELEVANT | NO_PDF_IN_PDF_WEB_MODE
+    sub_task_results: List[Dict[str, Any]]  # 每个子任务的检索结果与相关性判定
+    # 每个元素: {
+    #   "sub_query": str,
+    #   "route_tag": str,
+    #   "source_materials": List[Dict],  # 该子任务检索到的素材
+    #   "relevance_label": str,          # "relevant" | "irrelevant" | "insufficient"
+    #   "relevance_score": float,        # 0.0~1.0 相关性分数
+    # }
+
+    # ============================================================
+    #  【新增】Web 入库字段
+    # ============================================================
+    unified_collection: Any                    # 统一 Chroma 集合（PDF + Web）
+    web_chunks_validated: bool                # Web 切片是否已校验
+    web_chunks_in_db: int                     # 入库的 Web 切片数量
+
+    # ============================================================
+    #  【新增】后置段落校验结果
+    # ============================================================
+    post_check_results: List[Dict[str, Any]]  # 每段校验结果
+    # 每个元素: {paragraph_index, main_topic, key_assertions, level, problem_desc, rewrite_scope}
+    post_check_rewrite_count: int             # 后置校验重写次数（最大2次）
+    post_check_passed: bool                   # 后置校验是否通过
+    post_check_meltdown: bool                 # 后置校验熔断标志
+
+    # ============================================================
+    #  【新增】后置校验重写范围
+    # ============================================================
+    rewrite_scope: List[str]                  # 需要重写的段落标识列表
+    # 例如: ["行业现状", "竞品分析[0]", "机会与风险.机会[0]"]
 
 
 # 重新导出 create_initial_state 供业务层使用
