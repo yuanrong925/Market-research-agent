@@ -243,11 +243,12 @@ def targeted_rewrite(
     research_materials: str,
     model_mode: str,
     pdf_only: bool = False,
+    model_name: str = "",
 ) -> str:
     """定向重写：仅重写有问题的模块"""
     from core.utils.llm_utils import extract_llm_content
 
-    llm = get_llm(temperature=0.2, model_mode=model_mode)
+    llm = get_llm(temperature=0.2, model_mode=model_mode, model_name=model_name)
 
     # pdf_only 模式下追加强约束（使用全局常量）
     pdf_only_rule = PDF_ONLY_REWRITE_RULE if pdf_only else ""

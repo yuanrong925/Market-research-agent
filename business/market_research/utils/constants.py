@@ -50,6 +50,12 @@ RETRIEVAL_IRRELEVANT_THRESHOLD = 0.5
 RETRIEVAL_INSUFFICIENT_THRESHOLD = 0.7
 RETRIEVAL_RELEVANT_THRESHOLD = 0.7
 
+# 本地模型（Ollama）相关性阈值 — 更宽松，因为本地 embedding 质量低于云端
+# 本地模型向量相似度通常在 0.4~0.6 范围，放宽阈值避免误阻断
+LOCAL_RETRIEVAL_IRRELEVANT_THRESHOLD = 0.35
+LOCAL_RETRIEVAL_INSUFFICIENT_THRESHOLD = 0.5
+LOCAL_RETRIEVAL_RELEVANT_THRESHOLD = 0.5
+
 
 # ============================================================
 #  FactChecker 仅 PDF 模式约束（核查专用）

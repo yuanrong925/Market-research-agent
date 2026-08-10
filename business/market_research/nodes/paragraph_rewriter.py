@@ -90,11 +90,9 @@ def _find_and_replace_number(
             text = text.replace(pure_digits[0], correct_number, 1)
             logger.info(f"   [NumberFixer] 替换数字部分: {pure_digits[0]} -> {correct_number}")
     elif not correct_number:
-        # 找不到正确的数字，标记为需人工确认
-        logger.warning(f"   [NumberFixer] 数字 {wrong_number} 在素材中未找到，标记需人工确认")
-        # 如果数字在文本中，添加标记
-        if wrong_number in text:
-            text = text.replace(wrong_number, f"{wrong_number}【数字需人工确认】", 1)
+        # 找不到正确的数字，保留原数字，后续冲突检测将统一处理
+        logger.warning(f"   [NumberFixer] 数字 {wrong_number} 在素材中未找到，保留原数字")
+        # 不在报告中插入调试标记，数据分歧统一在冲突检测阶段呈现
 
     return text
 

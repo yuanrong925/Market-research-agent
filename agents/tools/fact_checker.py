@@ -22,6 +22,7 @@ def fact_check_report(
     report: str,
     research_materials: str,
     model_mode: str = "cloud",
+    model_name: str = "",
 ) -> Tuple[bool, List[Dict[str, str]]]:
     """
     事实核查 + 证据锚点验证
@@ -38,7 +39,7 @@ def fact_check_report(
     if not report.strip():
         return True, []
 
-    llm = get_llm(temperature=0.1, model_mode=model_mode)
+    llm = get_llm(temperature=0.1, model_mode=model_mode, model_name=model_name)
 
     # 分块处理（最多 3 块，每块 ≤6000 字符）
     max_chars = 6000
@@ -282,12 +283,13 @@ def rewrite_with_fixes(
     issues: List[Dict[str, str]],
     research_materials: str,
     model_mode: str = "cloud",
+    model_name: str = "",
 ) -> str:
     """根据事实核查结果重写报告，丢弃无锚点的条目"""
     if not issues:
         return report
 
-    llm = get_llm(temperature=0.2, model_mode=model_mode)
+    llm = get_llm(temperature=0.2, model_mode=model_mode, model_name=model_name)
 
     # 分离"丢弃"和"修改"项
     drop_sentences = []

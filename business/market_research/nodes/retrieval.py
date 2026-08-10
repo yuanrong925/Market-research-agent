@@ -16,6 +16,9 @@ from business.market_research.utils.constants import (
     RETRIEVAL_IRRELEVANT_THRESHOLD,
     RETRIEVAL_INSUFFICIENT_THRESHOLD,
     RETRIEVAL_RELEVANT_THRESHOLD,
+    LOCAL_RETRIEVAL_IRRELEVANT_THRESHOLD,
+    LOCAL_RETRIEVAL_INSUFFICIENT_THRESHOLD,
+    LOCAL_RETRIEVAL_RELEVANT_THRESHOLD,
     MAX_WEB_PAGES_TO_CLEAN,
 )
 
@@ -260,10 +263,15 @@ def _classify_sub_task_relevance(
     mode: str,
     sub_task: str,
     route_tag: str,
+    model_mode: str = "cloud",
 ) -> dict:
     """
     对单条子任务的检索结果进行相关性判定。
     返回子任务粒度的相关性判定结果。
+
+    根据 model_mode 动态选择阈值：
+      - cloud: 使用云端标准阈值（更高标准）
+      - local: 使用本地模型宽松阈值（避免误阻断）
     """
     if not reranked:
         return {
@@ -279,25 +287,33 @@ def _classify_sub_task_relevance(
     min_score = min(r.get("rerank_score", 0) for r in reranked)
     avg_score = sum(r.get("rerank_score", 0) for r in reranked) / len(reranked)
 
-    logger.info(f"   [子任务相关性] '{sub_task[:30]}...' 评分范围: {min_score:.2f}~{max_score:.2f} (avg={avg_score:.2f})")
+    logger.info(f"   [子任务相关性] '{sub_task[:30]}...' 评分范围: {min_score:.2f}~{max_score:.2f} (avg={avg_score:.2f}) mode={model_mode}")
 
-    if max_score < RETRIEVAL_IRRELEVANT_THRESHOLD:
+    # 根据 model_mode 动态选择阈值
+    if model_mode == "local":
+        irrelevant_threshold = LOCAL_RETRIEVAL_IRRELEVANT_THRESHOLD
+        insufficient_threshold = LOCAL_RETRIEVAL_INSUFFICIENT_THRESHOLD
+    else:
+        irrelevant_threshold = RETRIEVAL_IRRELEVANT_THRESHOLD
+        insufficient_threshold = RETRIEVAL_INSUFFICIENT_THRESHOLD
+
+    if max_score < irrelevant_threshold:
         return {
             "sub_task": sub_task,
             "route_tag": route_tag,
             "retrieved_chunks": reranked,
             "relevance": "irrelevant",
             "relevance_score": max_score,
-            "reason": f"全部检索结果与子任务不相关 (max_score={max_score:.2f} < {RETRIEVAL_IRRELEVANT_THRESHOLD})",
+            "reason": f"全部检索结果与子任务不相关 (max_score={max_score:.2f} < {irrelevant_threshold})",
         }
-    elif max_score < RETRIEVAL_INSUFFICIENT_THRESHOLD:
+    elif max_score < insufficient_threshold:
         return {
             "sub_task": sub_task,
             "route_tag": route_tag,
             "retrieved_chunks": reranked,
             "relevance": "insufficient",
             "relevance_score": max_score,
-            "reason": f"检索结果相关性不足 (max_score={max_score:.2f} < {RETRIEVAL_INSUFFICIENT_THRESHOLD})，素材不足以支撑完整分析",
+            "reason": f"检索结果相关性不足 (max_score={max_score:.2f} < {insufficient_threshold})，素材不足以支撑完整分析",
         }
     else:
         return {
@@ -306,7 +322,7 @@ def _classify_sub_task_relevance(
             "retrieved_chunks": reranked,
             "relevance": "relevant",
             "relevance_score": max_score,
-            "reason": f"检索结果与子任务相关 (max_score={max_score:.2f} >= {RETRIEVAL_INSUFFICIENT_THRESHOLD})",
+            "reason": f"检索结果与子任务相关 (max_score={max_score:.2f} >= {insufficient_threshold})",
         }
 
 
@@ -402,7 +418,7 @@ def _retrieve_for_sub_task(
             item["rerank_rank"] = rank + 1
 
     # 相关性判定
-    result = _classify_sub_task_relevance(reranked, mode, sub_task_text, route_tag)
+    result = _classify_sub_task_relevance(reranked, mode, sub_task_text, route_tag, model_mode)
     result["retrieved_chunks"] = reranked
     return result
 
@@ -480,12 +496,19 @@ def retrieval_node(state: AgentState):
         retrieval_relevance = "relevant"
         if reranked:
             max_score = max(r.get("rerank_score", 0) for r in reranked)
-            if max_score < RETRIEVAL_IRRELEVANT_THRESHOLD:
+            # 根据 model_mode 动态选择阈值
+            if model_mode == "local":
+                irrelevant_threshold = LOCAL_RETRIEVAL_IRRELEVANT_THRESHOLD
+                insufficient_threshold = LOCAL_RETRIEVAL_INSUFFICIENT_THRESHOLD
+            else:
+                irrelevant_threshold = RETRIEVAL_IRRELEVANT_THRESHOLD
+                insufficient_threshold = RETRIEVAL_INSUFFICIENT_THRESHOLD
+            if max_score < irrelevant_threshold:
                 retrieval_relevance = "irrelevant"
                 if mode == "pdf_only":
                     # 场景2/9: PDF内容完全不相关→早停
                     return {"top_k_chunks": [],"source_materials": [],"research_results": [],"web_search_used": False,"material_pool_frozen": True,"terminate_reason": "ALL_SUB_TASKS_IRRELEVANT","retrieval_relevance": "irrelevant","early_terminate": True,"error_message": "📄 该文档内容与您的查询不相关。请尝试切换至联网模式或上传更相关的文档","info_limitation_note": "文档内容不相关"}
-            elif max_score < RETRIEVAL_INSUFFICIENT_THRESHOLD:
+            elif max_score < insufficient_threshold:
                 retrieval_relevance = "insufficient"
 
         state["retrieval_relevance"] = retrieval_relevance

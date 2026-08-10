@@ -115,7 +115,7 @@ def analyst_node(state: AgentState):
     _analyst_start = __import__("time").time()
     material_text = _build_material_text(source_materials, citation_metadata, conflict_alerts)
 
-    llm = get_llm(temperature=0.2, model_mode=state.get("model_mode"))
+    llm = get_llm(temperature=0.2, model_mode=state.get("model_mode"), model_name=state.get("model_name", ""))
 
     system_prompt = get_prompt("system_prompt", "analyst.yaml")
 
@@ -196,12 +196,12 @@ async def streaming_analyst_node(state: AgentState) -> AsyncGenerator[str, None]
         for i, c in enumerate(source_materials)
     ]
 
-    yield f"data: {json.dumps({'step': 'analyst_start', 'msg': '开始分析规划（只读 source_materials）...'})}\n\n"
+    yield f"data: {json.dumps({'step': 'analyst_start', 'msg': '🧠 正在分析规划...'})}\n\n"
     await asyncio.sleep(0.05)
 
     material_text = _build_material_text(source_materials, citation_metadata, conflict_alerts)
 
-    llm = get_llm_streaming(temperature=0.2, model_mode=state.get("model_mode"))
+    llm = get_llm_streaming(temperature=0.2, model_mode=state.get("model_mode"), model_name=state.get("model_name", ""))
 
     system_prompt = get_prompt("system_prompt", "analyst_streaming.yaml")
 
@@ -212,11 +212,31 @@ async def streaming_analyst_node(state: AgentState) -> AsyncGenerator[str, None]
 
     full_content = ""
     try:
-        async for chunk in llm.astream(prompt):
+        # 先获取异步迭代器（await 协程，拿到 AsyncIterator）
+        stream = llm.astream(prompt)
+        # 只对第一个 chunk 做超时检测（连接超时），后续流式正常迭代
+        first_chunk = await asyncio.wait_for(anext(stream), timeout=120)
+        text = extract_text_content(first_chunk)
+        if text:
+            full_content += text
+            yield f"data: {json.dumps({'step': 'analyst_streaming', 'text': text})}\n\n"
+        else:
+            logger.debug(f"   [Analyst] 首个 chunk 无文本内容: type={type(first_chunk).__name__}, chunk={str(first_chunk)[:200]}")
+
+        # 剩余 chunk 正常迭代（不设超时，避免阻塞 async for）
+        async for chunk in stream:
             text = extract_text_content(chunk)
             if text:
                 full_content += text
                 yield f"data: {json.dumps({'step': 'analyst_streaming', 'text': text})}\n\n"
+            else:
+                logger.debug(f"   [Analyst] 流式 chunk 无文本内容: type={type(chunk).__name__}, chunk={str(chunk)[:200]}")
+    except asyncio.TimeoutError:
+        yield f"data: {json.dumps({'step': 'error', 'msg': 'Analyst 流式调用超时（120秒），请检查 Ollama 模型状态或网络连接'})}\n\n"
+        return
+    except StopAsyncIteration:
+        yield f"data: {json.dumps({'step': 'error', 'msg': 'Analyst 流式调用返回空，Ollama 未产出任何内容'})}\n\n"
+        return
     except Exception as e:
         yield f"data: {json.dumps({'step': 'error', 'msg': f'Analyst 分析失败: {str(e)}'})}\n\n"
         return

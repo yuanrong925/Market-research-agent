@@ -4,7 +4,7 @@
 功能：
   1. 从 PDF 和 Web 素材中通过正则提取数值（市场规模、增长率、营收、价格等）
   2. 对比同一主题的数值是否一致
-  3. 发现冲突时标记【待人工确认】，附上两类数据的原始来源链接
+  3. 发现冲突时标记数据分歧，附上两类数据的原始来源链接
   4. 不修改任何检索结果，仅在 state 中写入冲突标记
 
 边界控制：
@@ -335,7 +335,7 @@ def data_conflict_checker_node(state: Dict[str, Any]) -> Dict[str, Any]:
     conflict_warnings = []
     for c in conflicts:
         warning = (
-            f"🔴【数据冲突 · 待人工确认】{c['label']}\n"
+            f"🔴【数据冲突】{c['label']}\n"
             f"  📄 内部文档: {c['pdf_value']}{c['pdf_unit']} (来源: {c.get('pdf_source', '内部文档')})\n"
             f"  🌐 公开网络: {c['web_value']}{c['web_unit']} (来源: {c.get('web_source', '公开网络')})\n"
             f"  ⚠️ 差异率: {c['diff_ratio'] * 100:.1f}%\n"

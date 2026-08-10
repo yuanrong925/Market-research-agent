@@ -93,13 +93,13 @@ def _create_qwen_llm(temperature: float = 0.2, streaming: bool = False) -> BaseC
 #  Ollama 实现（本地）
 # ============================================================
 
-def _create_ollama_llm(temperature: float = 0.2, streaming: bool = False) -> BaseChatModel:
+def _create_ollama_llm(temperature: float = 0.2, streaming: bool = False, model_name: str = "") -> BaseChatModel:
     """创建本地 Ollama ChatOllama 实例"""
     from agents.config import OLLAMA_BASE_URL, OLLAMA_MODEL
     from langchain_ollama import ChatOllama
 
     base_url = OLLAMA_BASE_URL or "http://localhost:11434"
-    model = OLLAMA_MODEL or "qwen:7b"
+    model = model_name or OLLAMA_MODEL or "qwen:7b"
 
     logger.info(
         f"   🏠 创建 Ollama LLM: model={model}, temperature={temperature}, streaming={streaming}, base_url={base_url}"
@@ -109,6 +109,7 @@ def _create_ollama_llm(temperature: float = 0.2, streaming: bool = False) -> Bas
         temperature=temperature,
         base_url=base_url,
         streaming=streaming,
+        format="json",
     )
 
 
@@ -121,6 +122,7 @@ def _create_llm(
     model_mode: str = "cloud",
     provider: str = "deepseek",
     streaming: bool = False,
+    model_name: str = "",
 ) -> BaseChatModel:
     """
     根据 model_mode 和 provider 创建 LLM 实例。
@@ -130,6 +132,7 @@ def _create_llm(
       model_mode: "cloud" | "local"
       provider: "deepseek" | "qwen" | "ollama"
       streaming: 是否启用流式输出
+      model_name: 具体模型名称（local 模式下生效，如 qwen2.5:7b）
 
     返回:
       BaseChatModel 实例（ChatOpenAI 或 ChatOllama）
@@ -138,7 +141,7 @@ def _create_llm(
 
     # local 模式始终使用 Ollama
     if model_mode == "local":
-        return _create_ollama_llm(temperature=temperature, streaming=streaming)
+        return _create_ollama_llm(temperature=temperature, streaming=streaming, model_name=model_name)
 
     # cloud 模式根据 provider 选择
     if provider == "qwen":
@@ -156,6 +159,7 @@ def get_llm(
     temperature: float = 0.2,
     model_mode: Optional[str] = None,
     provider: str = "deepseek",
+    model_name: str = "",
 ) -> BaseChatModel:
     """
     获取 LLM 实例（全局缓存复用）。
@@ -164,6 +168,7 @@ def get_llm(
       temperature: 温度参数
       model_mode: "cloud" | "local"，不指定则从环境变量 MODEL_MODE 读取
       provider: "deepseek" | "qwen" | "ollama"
+      model_name: 具体模型名称（local 模式下生效，如 qwen2.5:7b）
 
     返回:
       ChatOpenAI 或 ChatOllama 实例
@@ -171,7 +176,7 @@ def get_llm(
     model_mode = (model_mode or MODEL_MODE).strip().lower()
 
     # 构造缓存键
-    cache_key = f"{model_mode}:{provider}:{temperature}"
+    cache_key = f"{model_mode}:{provider}:{temperature}:{model_name}"
     if cache_key in _LLM_CACHE:
         logger.debug(f"[LLM] 缓存命中: {cache_key}")
         return _LLM_CACHE[cache_key]
@@ -181,9 +186,10 @@ def get_llm(
         model_mode=model_mode,
         provider=provider,
         streaming=False,
+        model_name=model_name,
     )
     _LLM_CACHE[cache_key] = instance
-    logger.info(f"[LLM] 创建新实例: mode={model_mode}, provider={provider}, temperature={temperature}")
+    logger.info(f"[LLM] 创建新实例: mode={model_mode}, provider={provider}, temperature={temperature}, model={model_name or 'default'}")
     return instance
 
 
@@ -195,6 +201,7 @@ def get_llm_streaming(
     temperature: float = 0.2,
     model_mode: Optional[str] = None,
     provider: str = "deepseek",
+    model_name: str = "",
 ) -> BaseChatModel:
     """
     获取支持流式输出的 LLM 实例（全局缓存复用）。
@@ -203,6 +210,7 @@ def get_llm_streaming(
       temperature: 温度参数
       model_mode: "cloud" | "local"，不指定则从环境变量 MODEL_MODE 读取
       provider: "deepseek" | "qwen" | "ollama"
+      model_name: 具体模型名称（local 模式下生效，如 qwen2.5:7b）
 
     返回:
       ChatOpenAI 或 ChatOllama 实例（streaming=True）
@@ -210,7 +218,7 @@ def get_llm_streaming(
     model_mode = (model_mode or MODEL_MODE).strip().lower()
 
     # 构造缓存键
-    cache_key = f"{model_mode}:{provider}:{temperature}:streaming"
+    cache_key = f"{model_mode}:{provider}:{temperature}:streaming:{model_name}"
     if cache_key in _LLM_STREAMING_CACHE:
         logger.debug(f"[LLM] 流式缓存命中: {cache_key}")
         return _LLM_STREAMING_CACHE[cache_key]
@@ -220,9 +228,10 @@ def get_llm_streaming(
         model_mode=model_mode,
         provider=provider,
         streaming=True,
+        model_name=model_name,
     )
     _LLM_STREAMING_CACHE[cache_key] = instance
-    logger.info(f"[LLM] 创建新流式实例: mode={model_mode}, provider={provider}, temperature={temperature}")
+    logger.info(f"[LLM] 创建新流式实例: mode={model_mode}, provider={provider}, temperature={temperature}, model={model_name or 'default'}")
     return instance
 
 
@@ -245,6 +254,7 @@ def get_llm_with_fallback(
     temperature: float = 0.2,
     model_mode: Optional[str] = None,
     provider: str = "deepseek",
+    model_name: str = "",
 ) -> BaseChatModel:
     """
     获取 LLM 实例，local 失败时自动回退到 cloud。
@@ -253,6 +263,7 @@ def get_llm_with_fallback(
       temperature: 温度参数
       model_mode: "cloud" | "local"
       provider: "deepseek" | "qwen" | "ollama"
+      model_name: 具体模型名称（local 模式下生效，如 qwen2.5:7b）
 
     返回:
       BaseChatModel 实例
@@ -262,11 +273,11 @@ def get_llm_with_fallback(
     # 优先尝试 local
     if model_mode == "local":
         try:
-            return get_llm(temperature=temperature, model_mode="local", provider="ollama")
+            return get_llm(temperature=temperature, model_mode="local", provider="ollama", model_name=model_name)
         except Exception as exc:
             logger.warning(f"[LLM] 本地模型失败，回退云端: {exc}")
             return get_llm(temperature=temperature, model_mode="cloud", provider=provider)
 
-    return get_llm(temperature=temperature, model_mode=model_mode, provider=provider)
+    return get_llm(temperature=temperature, model_mode=model_mode, provider=provider, model_name=model_name)
 
 

@@ -155,7 +155,18 @@ pre { white-space: pre-wrap; word-break: break-word; color: #dbeeff; font-size:1
   font-size: 13px; font-weight: 600; color: var(--accent);
   text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
 }
-.summary-text { font-size: 15px; line-height: 1.6; color: var(--text); }
+/* 摘要文本 — 英文字母/数字间距紧凑，汉字正常间距，避免溢出 */
+.summary-text {
+  font-size: 15px; line-height: 1.6; color: var(--text);
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+.summary-text p {
+  margin: 4px 0; line-height: 1.8;
+  word-spacing: 0.04em;
+  text-rendering: optimizeLegibility;
+}
 .bg-text { margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
 
 /* 分区标题（关键发现、结论、建议） */

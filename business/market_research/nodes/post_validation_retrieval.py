@@ -168,7 +168,7 @@ def post_validation_retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         return {"validation_retry_count": validation_retry_count, "need_revalidation": False}
 
     passed_count = len(source_materials)
-    if passed_count >= 5:
+    if passed_count >= 2:
         logger.info(f"   [PostValidationRetrieval] 素材充足 ({passed_count} 条)，无需二次检索")
         return {"validation_retry_count": validation_retry_count, "need_revalidation": False}
 

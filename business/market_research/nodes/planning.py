@@ -97,7 +97,7 @@ def plan_node(state: AgentState) -> Dict[str, Any]:
         logger.info(f"   [PlanNode] 强制 route_tag: {forced_route_tag}")
     _plan_start = __import__("time").time()
 
-    llm = get_llm(temperature=0.3, model_mode=state.get("model_mode"))
+    llm = get_llm(temperature=0.3, model_mode=state.get("model_mode"), model_name=state.get("model_name", ""))
     system_prompt = get_prompt("system_prompt", "market_planning.yaml")
 
     # 构建模式约束提示

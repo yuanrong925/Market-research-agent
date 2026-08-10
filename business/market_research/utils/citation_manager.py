@@ -19,6 +19,51 @@ CONFIDENCE_PDF = 0.9      # 内部保密文档
 CONFIDENCE_WEB = 0.6      # 外网公开资讯
 
 
+# ============================================================
+#  【新增】中文字符安全过滤：清除 PDF 解析产生的乱码字符
+# ============================================================
+def _sanitize_text_for_display(text: str, max_len: int = 120) -> str:
+    """
+    过滤掉 PDF 解析时可能产生的乱码字符（Mojibake），
+    只保留可读的中文、英文、数字、标点符号。
+    """
+    if not text:
+        return ""
+    text = text[:max_len]
+    cleaned = []
+    for ch in text:
+        cp = ord(ch)
+        # 保留标准 ASCII 可打印字符、中文 CJK、中文标点、全角字符等
+        if (0x20 <= cp <= 0x7E) or \
+           (0x3000 <= cp <= 0x303F) or \
+           (0x3400 <= cp <= 0x4DBF) or \
+           (0x4E00 <= cp <= 0x9FFF) or \
+           (0xAC00 <= cp <= 0xD7AF) or \
+           (0xF900 <= cp <= 0xFAFF) or \
+           (0xFE10 <= cp <= 0xFE1F) or \
+           (0xFF00 <= cp <= 0xFFEF) or \
+           cp in (0x00A0, 0x00A1, 0x00A9, 0x00AE):
+            cleaned.append(ch)
+        # 跳过私用区字符 (0xE000-0xF8FF)
+        elif 0xE000 <= cp <= 0xF8FF:
+            continue
+        # 跳过 CP1252 控制字符 (0x80-0x9F)
+        elif 0x0080 <= cp <= 0x009F:
+            continue
+        # 跳过代理区
+        elif 0xD800 <= cp <= 0xDFFF:
+            continue
+        # 表情符号 / CJK 扩展B/C/D/E 保留
+        elif 0x1F000 <= cp <= 0x1FFFF or 0x20000 <= cp <= 0x2FFFF:
+            cleaned.append(ch)
+        else:
+            cleaned.append(ch)
+    result = "".join(cleaned).strip()
+    if not result:
+        return "（原始文本片段）"
+    return result
+
+
 def build_citation_metadata(source_materials: List[Dict], pdf_only: bool = False) -> List[Dict]:
     """
     为检索结果中的每一条素材生成标准化引用元数据。
@@ -205,7 +250,9 @@ def generate_references_section(citation_metadata: List[Dict], pdf_only: bool = 
     for cit in citation_metadata:
         ref_id = cit.get("ref_id", 0)
         source_type = cit.get("source_type", "unknown")
-        snippet = cit.get("snippet", "")[:120]
+        # ===== 【修复】使用 _sanitize_text_for_display 过滤乱码字符 =====
+        raw_snippet = cit.get("snippet", "")
+        snippet = _sanitize_text_for_display(raw_snippet, max_len=120)
 
         if source_type == "pdf":
             doc_name = cit.get("doc_name", "内部文档")

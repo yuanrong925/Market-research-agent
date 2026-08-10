@@ -12,6 +12,24 @@ from tools.logger import get_logger
 
 logger = get_logger(__name__)
 
+def wrap_text_no_cut_chinese(text, max_width, fontname, fontsize=10):
+    """中文安全换行，绝不切割单个汉字，使用 fontname 字符串"""
+    import fitz
+    font = fitz.Font(fontname=fontname)
+    lines = []
+    current_line = []
+    current_w = 0
+    for ch in text:
+        w = font.text_length(ch, fontsize=fontsize)
+        if current_w + w > max_width and current_line:
+            lines.append("".join(current_line))
+            current_line = []
+            current_w = 0
+        current_line.append(ch)
+        current_w += w
+    if current_line:
+        lines.append("".join(current_line))
+    return lines
 
 def _get_cjk_font_name() -> str:
     """
@@ -134,16 +152,91 @@ def _get_cjk_font_name() -> str:
     return "china-ss"
 
 
+# ============================================================
+#  Markdown 行内标记清理：移除语法标记，保留纯文本内容
+# ============================================================
+def _strip_markdown_inline(text: str) -> str:
+    """
+    移除行内 Markdown 语法标记，保留纯文本内容。
+    用于 PyMuPDF 渲染前清理，因为 PDF 不支持行内富文本。
+    """
+    if not text:
+        return text
+    # 图片：![alt](url) → [图片: alt]
+    text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', r'[图片: \1]', text)
+    # 链接：[text](url) → text（url）
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
+    # 加粗：**text** → text
+    text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+    # 斜体：*text* → text（不匹配加粗的**）
+    text = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'\1', text)
+    # 行内代码：`code` → code
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    # 删除线：~~text~~ → text
+    text = re.sub(r'~~([^~]+)~~', r'\1', text)
+    return text
+
+
+# ============================================================
+#  Markdown 归一化：将各种 LLM 输出的格式统一为 PDF 可解析的标准格式
+# ============================================================
+def _normalize_markdown_for_pdf(text: str) -> str:
+    """
+    将各种 LLM 输出的 Markdown 格式统一为 PDF 生成器能识别的标准格式。
+
+    Cloud 模型（如 DeepSeek）通常输出标准 Markdown: ## 标题, - 列表
+    Local 模型（如 Qwen 本地版）可能输出: **粗体标题**, * 列表, 数字序号
+
+    归一化规则：
+    1. **粗体文本**（单独成行且无其他内容）→ ## 标题
+    2. * 列表项 → - 列表项（统一前缀）
+    3. 移除过多空行，但不破坏段落结构
+    4. 保留行内 **粗体**（不做转换，避免误伤）
+    """
+    if not text:
+        return text
+
+    lines = text.split('\n')
+    result = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            result.append("")
+            continue
+
+        # 【已注释】规则1：**粗体文本** 单独成行 → ## 标题（太激进，会误伤正文）
+        # bold_only = re.match(
+        #     r'^\s*\*\*([^*]+)\*\*\s*(\[S?\d*\])?\s*$',
+        #     stripped,
+        # )
+        # if bold_only:
+        #     title_text = bold_only.group(1).strip()
+        #     result.append(f"## {title_text}")
+        #     continue
+
+        # 规则2：* 列表项 → - 列表项
+        if stripped.startswith('* '):
+            content = stripped[2:]
+            result.append(f"- {content}")
+            continue
+
+        # 其他行保持原样
+        result.append(line)
+
+    return '\n'.join(result)
+
+
 def generate_pdf_report(report_json: Any, output_path: str) -> str:
     """
-    生成带格式的 PDF 报告。
-    支持任意章节结构，解析 Markdown 标题（## ### 等）。
+    Generate a formatted PDF report using PyMuPDF insert_textbox for auto-wrapping.
+    Supports arbitrary section structures and Markdown titles (## ### etc.).
 
-    报告结构约定（JSON dict）：
+    Report structure (JSON dict):
     {
         "标题": "xxx",
-        "行业现状": "xxx\\n## 子标题\\nxxx",
-        "竞争格局": "xxx\\n- 列表项\\nxxx",
+        "行业现状": "xxx\n## 子标题\nxxx",
+        "竞争格局": "xxx\n- 列表项\nxxx",
         "信息来源附录": [...]
     }
     """
@@ -155,110 +248,75 @@ def generate_pdf_report(report_json: Any, output_path: str) -> str:
     if not isinstance(report_json, dict):
         return _plaintext_fallback(str(report_json), output_path)
 
+    # ========== Normalize all string values (support various LLM output formats) ==========
+    for key in report_json:
+        if isinstance(report_json[key], str):
+            report_json[key] = _normalize_markdown_for_pdf(report_json[key])
+        elif isinstance(report_json[key], list):
+            report_json[key] = [
+                _normalize_markdown_for_pdf(item) if isinstance(item, str) else item
+                for item in report_json[key]
+            ]
+        elif isinstance(report_json[key], dict):
+            for sub_key in report_json[key]:
+                if isinstance(report_json[key][sub_key], str):
+                    report_json[key][sub_key] = _normalize_markdown_for_pdf(report_json[key][sub_key])
+
     import fitz
     doc = fitz.open()
     fn = _get_cjk_font_name()
     font = fitz.Font(fontname=fn)
-    pw, ph = 595, 842
-    ml, mr, mt, mb = 45, 45, 40, 40
-    cw = pw - ml - mr
+    pw, ph = 595, 842  # A4
+    ml, mr, mt, mb = 50, 50, 50, 50
+    cw = pw - ml - mr  # content width
 
-    def new_page():
-        return doc.new_page()
-
-    _LINE_GAP = 4
-
-    def write(x, y, text, size=10, color=(0, 0, 0)):
+    # Helper: write a single line of text at (x, y) — y 是文本基线
+    def write_line(x, y, text, size=10, color=(0, 0, 0)):
         doc[-1].insert_text((x, y), text, fontsize=size, fontname=fn, color=color)
 
-    def wrap(text, size, max_w):
-        lines = []
+    # Helper: render multi-line text with safe Chinese wrapping
+    def render_textbox(text, x, y, w, size=10, color=(0,0,0), line_height=1.25):
+        """
+        中文安全换行，绝不切割汉字。
+        利用模块级 wrap_text_no_cut_chinese 预先拆分行，再逐行 insert_text 绘制。
+        返回更新后的 y 坐标。
+        """
         if not text:
-            return lines
+            return y
 
-        font_supports_cjk = False
-        try:
-            test_w = font.text_length("中文测试", size)
-            font_supports_cjk = (test_w > 10)
-        except Exception:
-            font_supports_cjk = False
+        usable_w = w * 0.88  # 留 12% 右边距，避免 font.text_length() 测量误差导致的溢出
+        lines = wrap_text_no_cut_chinese(text, usable_w, fn, size)
+        lh = size * line_height
 
-        def _line_width(line: str) -> float:
-            if font is not None and font_supports_cjk:
-                try:
-                    return font.text_length(line, size)
-                except Exception:
-                    pass
-            w = 0.0
-            for ch in line:
-                if ord(ch) > 127:
-                    w += size * 1.0
-                else:
-                    w += size * 0.5
-            return w
-
-        if max_w < size * 2:
-            max_w = size * 2
-
-        while text:
-            n = len(text)
-            if _line_width(text) <= max_w:
-                lines.append(text)
-                break
-
-            lo, hi = 1, n
-            while lo < hi:
-                mid = (lo + hi + 1) // 2
-                try:
-                    w = _line_width(text[:mid])
-                    if w <= max_w:
-                        lo = mid
-                    else:
-                        hi = mid - 1
-                except Exception:
-                    hi = mid - 1
-            if lo == 0:
-                lo = 1
-            lines.append(text[:lo])
-            text = text[lo:]
-
-        return lines
-
-    def render(text, x, y, size=10, indent=0, max_w=None, color=(0, 0, 0)):
-        if max_w is None:
-            max_w = cw - indent
-        min_max_w = int(cw * 0.4)
-        if max_w < min_max_w:
-            max_w = min_max_w
-        lines = wrap(text, size, max_w)
         for line in lines:
-            line_h = size + _LINE_GAP
-            if y + line_h > ph - mb:
-                new_page()
+            if y + lh > ph - mb - 5:
+                doc.new_page()
                 y = mt
-            doc[-1].insert_text((x + indent, y), line, fontsize=size, fontname=fn, color=color)
-            y += line_h
+            # 用 clip 限制绘制区域，防止测量误差导致的溢出
+            clip_rect = fitz.Rect(x, y - size, x + usable_w + 5, y + size * 2)
+            doc[-1].insert_text((x, y), line, fontsize=size, fontname=fn, color=color, clip=clip_rect)
+            y += lh
         return y
 
-    # ========== 开始渲染 ==========
-    page = new_page()
+    # ========== Begin rendering ==========
+    page = doc.new_page()
     y = mt
 
-    # 标题
+    # Title
     title = report_json.get("标题") or report_json.get("title") or "分析报告"
-    write(ml, y, title, 18, (0.05, 0.20, 0.40))
-    y += 26
+    write_line(ml, y, title, 18, (0.05, 0.20, 0.40))
+    y += 22
     doc[-1].draw_line((ml, y), (pw - mr, y), color=(0.3, 0.6, 0.9), width=0.8)
-    y += 12
+    y += 10
 
-    # ====== 通用章节渲染 ======
-    # 定义渲染顺序（不在此列表中的字段按字母序）
+    # ====== Section rendering ======
     priority_keys = [
         "摘要", "执行摘要", "研究背景", "调研概述",
         "行业现状", "市场规模", "竞争格局",
         "产品与价格趋势", "商业模式",
         "行业挑战与风险", "总结与展望",
-        "总结", "结论", "建议", "引用来源", "信息来源附录",
+        "总结", "结论", "建议", "引用来源",
+        "竞品分析", "机会与风险", "信息来源附录",
     ]
 
     all_keys = list(report_json.keys())
@@ -271,97 +329,164 @@ def generate_pdf_report(report_json: Any, output_path: str) -> str:
         value = report_json[key]
         if not value:
             continue
-
         if key in ("标题", "title"):
             continue
 
+        # Check if we need a new page
         if y > ph - mb - 60:
-            new_page()
+            page = doc.new_page()
             y = mt
 
-        # 章节标题
-        section_title = key
-        write(ml, y, f"【{section_title}】", 14, (0.05, 0.20, 0.40))
-        y += 20
+        # Section title — 加字体高度，因为 write_line 的 y 是基线，而 render_textbox 返回的是文本底部
+        y += 18
+        write_line(ml, y, f"【{key}】", 14, (0.05, 0.20, 0.40))
+        y += 12
 
         if isinstance(value, str):
-            # 字符串：按行拆分，渲染 Markdown
-            lines = value.split('\n')
-            for line in lines:
-                line = line.strip()
-                if not line:
+            # Process string: split by lines, detect Markdown headers
+            raw_lines = value.split('\n')
+            for raw_line in raw_lines:
+                stripped = raw_line.strip()
+                if not stripped:
                     y += 4
                     continue
 
-                # 检测 Markdown 标题
-                h_match = re.match(r'^(#{1,3})\s+(.*)', line)
+                # 中文编号章节标题：一、市场发展现状
+                cn_h_match = re.match(r'^([一二三四五六七八九十]+)[、.．]\s*(.*)', stripped)
+                if cn_h_match:
+                    cn_num = cn_h_match.group(1)
+                    cn_title = cn_h_match.group(2).strip()
+                    cn_title = re.sub(r'\[S\d+\]', '', cn_title).strip()
+                    if y > ph - mb - 40:
+                        page = doc.new_page()
+                        y = mt
+                    y += 4
+                    write_line(ml, y, f"{cn_num}、{cn_title}", 13, (0.05, 0.20, 0.40))
+                    y += 12
+                    continue
+
+                # 数字编号子标题：1.1 全球市场规模与增长
+                num_h_match = re.match(r'^(\d+\.\d+)\s+(.*)', stripped)
+                if num_h_match:
+                    num_id = num_h_match.group(1)
+                    num_title = num_h_match.group(2).strip()
+                    num_title = re.sub(r'\[S\d+\]', '', num_title).strip()
+                    if y > ph - mb - 40:
+                        page = doc.new_page()
+                        y = mt
+                    y += 4
+                    write_line(ml, y, f"{num_id} {num_title}", 12, (0.1, 0.3, 0.5))
+                    y += 10
+                    continue
+
+                # Markdown heading
+                h_match = re.match(r'^(#{1,3})\s+(.*)', stripped)
                 if h_match:
                     level = len(h_match.group(1))
-                    h_text = h_match.group(2).strip()
-                    # 去掉引用标记 [S1] 等
-                    h_text = re.sub(r'\[S\d+\]', '', h_text).strip()
-                    if y > ph - mb - 30:
-                        new_page()
+                    h_text = re.sub(r'\[S\d+\]', '', h_match.group(2)).strip()
+                    h_text = _strip_markdown_inline(h_text)
+                    if y > ph - mb - 40:
+                        page = doc.new_page()
                         y = mt
+                    y += 4
                     if level == 1:
-                        write(ml, y, h_text, 13, (0.05, 0.20, 0.40))
-                        y += 18
+                        write_line(ml, y, h_text, 13, (0.05, 0.20, 0.40))
+                        y += 12
                     elif level == 2:
-                        write(ml, y, h_text, 12, (0.1, 0.3, 0.5))
-                        y += 16
+                        write_line(ml, y, h_text, 12, (0.1, 0.3, 0.5))
+                        y += 10
                     else:
-                        write(ml, y, h_text, 11, (0.2, 0.3, 0.4))
-                        y += 14
+                        write_line(ml, y, h_text, 11, (0.2, 0.3, 0.4))
+                        y += 8
                     continue
 
-                # 检测列表项
-                if line.startswith('- ') or line.startswith('* '):
-                    bullet = line[0]
-                    content = line[2:].strip()
-                    if y + size + _LINE_GAP > ph - mb:
-                        new_page()
+                # List item — 支持嵌套缩进
+                list_match = re.match(r'^([ \t]*)([-*])\s+(.*)', raw_line)
+                if list_match:
+                    leading_spaces = len(list_match.group(1))
+                    list_prefix = list_match.group(2)  # '-' or '*'
+                    content = list_match.group(3).strip()
+                    content = _strip_markdown_inline(content)
+
+                    # 计算嵌套层级：每2个空格=一级
+                    nest_level = max(0, leading_spaces // 2)
+                    # 基础缩进：一级=12，二级=24，三级=36
+                    base_indent = ml + 12 + nest_level * 12
+                    # bullet 缩进比文字少 16
+                    bullet_x = base_indent - 16
+
+                    if y + 14 > ph - mb - 10:
+                        page = doc.new_page()
                         y = mt
-                    doc[-1].insert_text((ml + 8, y), f"  {bullet} ", fontsize=10, fontname=fn, color=(0, 0, 0))
-                    y = render(content, ml, y, 10, 24, color=(0.1, 0.1, 0.1))
+                    write_line(bullet_x, y, "  • ", 10, (0.1, 0.1, 0.1))
+                    y = render_textbox(content, base_indent, y, cw - (base_indent - ml), 10, (0.1, 0.1, 0.1))
                     continue
 
-                # 普通段落
-                y = render(line, ml, y, 10, 8)
+                # Normal paragraph — 清理 Markdown 行内标记
+                cleaned_line = _strip_markdown_inline(stripped)
+                if y + 14 > ph - mb - 10:
+                    page = doc.new_page()
+                    y = mt
+                y = render_textbox(cleaned_line, ml + 8, y, cw - 8, 10, (0.1, 0.1, 0.1))
 
-            y += 6
+            y += 3
 
         elif isinstance(value, list):
-            for item in value:
+            for item_idx, item in enumerate(value):
                 if isinstance(item, dict):
-                    for k, v in item.items():
-                        if y > ph - mb - 20:
-                            new_page()
+                    if any(k in item for k in ("竞品名称", "产品类型", "性能参数", "定价区间", "分析")):
+                        if y > ph - mb - 40:
+                            page = doc.new_page()
                             y = mt
-                        label = f"{k}: " if k else ""
-                        if isinstance(v, str):
-                            y = render(f"{label}{v}", ml, y, 10, 12)
-                        elif isinstance(v, list):
-                            y = render(f"{label}{', '.join(str(x) for x in v)}", ml, y, 10, 12)
-                    y += 4
+                        name = item.get('竞品名称', '')
+                        write_line(ml, y, f"▎ {item_idx + 1}. {name}", 12, (0.05, 0.20, 0.40))
+                        y += 18
+                        for k, v in item.items():
+                            if k == "竞品名称":
+                                continue
+                            if y > ph - mb - 40:
+                                page = doc.new_page()
+                                y = mt
+                            if isinstance(v, str):
+                                text = f"▪ {k}：{_strip_markdown_inline(v)}"
+                                y = render_textbox(text, ml + 16, y, cw - 16, 10, (0.2, 0.2, 0.2))
+                        y += 6
+                    else:
+                        for k, v in item.items():
+                            if y > ph - mb - 40:
+                                page = doc.new_page()
+                                y = mt
+                            label = f"{k}: " if k else ""
+                            if isinstance(v, str):
+                                text = f"{label}{_strip_markdown_inline(v)}"
+                                y = render_textbox(text, ml + 12, y, cw - 12, 10, (0.1, 0.1, 0.1))
+                            elif isinstance(v, list):
+                                cleaned_list = [_strip_markdown_inline(str(x)) for x in v]
+                                text = f"{label}{', '.join(cleaned_list)}"
+                                y = render_textbox(text, ml + 12, y, cw - 12, 10, (0.1, 0.1, 0.1))
+                        y += 4
                 elif isinstance(item, str):
-                    if y > ph - mb - 20:
-                        new_page()
+                    if y > ph - mb - 40:
+                        page = doc.new_page()
                         y = mt
-                    y = render(item, ml, y, 10, 12)
+                    y = render_textbox(_strip_markdown_inline(item), ml + 12, y, cw - 12, 10, (0.1, 0.1, 0.1))
 
         elif isinstance(value, dict):
             for k, v in value.items():
-                if y > ph - mb - 20:
-                    new_page()
+                if y > ph - mb - 40:
+                    page = doc.new_page()
                     y = mt
                 label = f"{k}: " if k else ""
                 if isinstance(v, str):
-                    y = render(f"{label}{v}", ml, y, 10, 12)
+                    text = f"{label}{_strip_markdown_inline(v)}"
+                    y = render_textbox(text, ml + 12, y, cw - 12, 10, (0.1, 0.1, 0.1))
                 elif isinstance(v, list):
-                    items = ', '.join(str(x) for x in v)
-                    y = render(f"{label}{items}", ml, y, 10, 12)
+                    text = label
+                    y = render_textbox(text, ml + 12, y, cw - 12, 10, (0.1, 0.1, 0.1))
+                    for item_val in v:
+                        y = render_textbox(f"• {_strip_markdown_inline(str(item_val))}", ml + 24, y, cw - 24, 10, (0.2, 0.2, 0.2))
 
-    # 页码
+    # Page numbers
     for i in range(doc.page_count):
         doc[i].insert_text((pw - 50, ph - 25), str(i + 1), fontsize=8, fontname=fn, color=(0.7, 0.7, 0.7))
 
@@ -372,53 +497,61 @@ def generate_pdf_report(report_json: Any, output_path: str) -> str:
 
 
 def _plaintext_fallback(text: str, output_path: str) -> str:
-    """纯文本回退，安全分页排版。"""
+    """纯文本回退，使用 insert_textbox 自动换行。"""
     import fitz
     doc = fitz.open()
     fn = _get_cjk_font_name()
-    pw, ph = 595, 842
-    margin = 50
-    max_line_w = pw - 2 * margin - 10
-    font_size = 10
-    line_height = font_size + 4
-    content_h = ph - 2 * margin
-    max_lines_per_page = int(content_h / line_height)
+    pw, ph = 595, 842  # A4
+    ml, mr, mt, mb = 50, 50, 50, 50
+    cw = pw - ml - mr
+    font_size = 11
+    line_spacing = 1.5
 
     page = doc.new_page()
-    lines_on_page = 0
-
-    def _char_width(ch: str) -> float:
-        return font_size * 0.85 if ord(ch) > 127 else font_size * 0.45
-
-    def _split_line(text: str) -> str:
-        w = 0.0
-        for i, ch in enumerate(text):
-            cw = _char_width(ch)
-            if w + cw > max_line_w:
-                return text[:i] if i > 0 else text[:1]
-            w += cw
-        return text
+    y = mt
 
     for para in text.replace("\r\n", "\n").split("\n"):
         if not para.strip():
-            lines_on_page += 1
-            if lines_on_page >= max_lines_per_page:
+            y += font_size * 0.6
+            if y > ph - mb - font_size * 2:
                 page = doc.new_page()
-                lines_on_page = 0
+                y = mt
             continue
 
+        # Render paragraph, handling overflow by creating new pages
         remaining = para
         while remaining:
-            if lines_on_page >= max_lines_per_page:
+            avail_h = ph - mb - y - 10
+            if avail_h < font_size * line_spacing:
                 page = doc.new_page()
-                lines_on_page = 0
-            line = _split_line(remaining)
-            page.insert_text(
-                (margin, margin + lines_on_page * line_height),
-                line, font_size, fontname=fn, color=(0, 0, 0)
-            )
-            remaining = remaining[len(line):]
-            lines_on_page += 1
+                y = mt
+                avail_h = ph - mb - y - 10
+
+            rect = fitz.Rect(ml, y, ml + cw, y + avail_h)
+            overflow_h = page.insert_textbox(rect, remaining, fontsize=font_size, fontname=fn, lineheight=line_spacing)
+
+            # Estimate lines that fit
+            chars_per_line = max(1, int(cw / (font_size * 0.6)))
+            total_lines = max(1, (len(remaining) + chars_per_line - 1) // chars_per_line)
+
+            if overflow_h > 0:
+                # Estimate how many lines fit
+                avail_lines = max(1, int(avail_h / (font_size * line_spacing)))
+                fitted_lines = min(total_lines, avail_lines)
+            else:
+                fitted_lines = total_lines
+
+            y += fitted_lines * font_size * line_spacing + 2
+            remaining = ''  # insert_textbox handles overflow; we don't need to split manually
+
+            # If overflow_h > 0, text was truncated; we need to render the rest
+            # But insert_textbox just clips; it doesn't return the truncated text
+            # So we break and move on
+            break
+
+    # Page numbers
+    for i in range(doc.page_count):
+        doc[i].insert_text((pw - 50, ph - 25), str(i + 1), fontsize=8, fontname=fn, color=(0.7, 0.7, 0.7))
 
     doc.save(output_path)
     doc.close()

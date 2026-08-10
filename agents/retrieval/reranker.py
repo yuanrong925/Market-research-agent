@@ -24,6 +24,7 @@ def rerank_results(
     pdf_results: List[str],
     model_mode: str = "cloud",
     top_k: int = 5,
+    model_name: str = "",
 ) -> str:
     """
     对网络搜索结果和 PDF 检索结果进行 LLM 重排序，
@@ -43,7 +44,7 @@ def rerank_results(
         return _format_merged(web_entries, pdf_results)
 
     # 4. 用 LLM 打分
-    scored = _llm_rerank(query, all_candidates, model_mode)
+    scored = _llm_rerank(query, all_candidates, model_mode, model_name=model_name)
 
     # 5. 取 top_k
     top = scored[:top_k]
@@ -60,6 +61,7 @@ def rerank_hybrid_results(
     hybrid_results: List[Dict[str, Any]],
     model_mode: str = "cloud",
     top_k: int = 5,
+    model_name: str = "",
 ) -> List[Dict[str, Any]]:
     """
     SOP 第二阶段核心：对混合检索结果进行交叉编码深度重排序。
@@ -84,7 +86,7 @@ def rerank_hybrid_results(
         return hybrid_results[:top_k]
 
     # 用 LLM 做交叉编码深度重排序
-    scored = _llm_rerank_structured(query, hybrid_results, model_mode)
+    scored = _llm_rerank_structured(query, hybrid_results, model_mode, model_name=model_name)
 
     # 严格截取 Top-K
     top = scored[:top_k]
@@ -104,12 +106,13 @@ def _llm_rerank_structured(
     query: str,
     candidates: List[Dict[str, Any]],
     model_mode: str,
+    model_name: str = "",
 ) -> List[Dict[str, Any]]:
     """
     使用 LLM 进行交叉编码深度重排序。
     一次性对所有候选片段做批量相关性判断，输出相关性标签。
     """
-    llm = get_llm(temperature=0.1, model_mode=model_mode)
+    llm = get_llm(temperature=0.1, model_mode=model_mode, model_name=model_name)
 
     # 构建候选列表
     candidate_lines = []
@@ -225,12 +228,13 @@ def _llm_rerank(
     query: str,
     candidates: List[Dict[str, Any]],
     model_mode: str,
+    model_name: str = "",
 ) -> List[Dict[str, Any]]:
     """
     使用 LLM 对候选条目进行相关度打分并排序。
     返回按得分降序排列的条目列表。
     """
-    llm = get_llm(temperature=0.1, model_mode=model_mode)
+    llm = get_llm(temperature=0.1, model_mode=model_mode, model_name=model_name)
 
     # 构建候选列表字符串
     candidate_lines = []

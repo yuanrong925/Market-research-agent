@@ -89,18 +89,10 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // 将 Markdown 文本转为 HTML
-    // 将 Markdown 文本转为 HTML（支持完整 Markdown 语法 + 数据差异蓝色提示）
+    // 将 Markdown 文本转为 HTML（支持完整 Markdown 语法）
+    // 数据差异标记已在前端渲染为普通文本，不额外着色
     function renderMarkdown(text) {
       if (!text) return '';
-      // 检测数据差异提示 → 整体包裹蓝色样式
-      var hasDiscrepancy = /\u26a0\ufe0f\u3010\u5f85\u4eba\u5de5\u786e\u8ba4\u3011/.test(text);
-      var wrapBlue = '';
-      var wrapBlueEnd = '';
-      if (hasDiscrepancy) {
-        wrapBlue = '<div style="color:#2563eb;background:#eff6ff;padding:8px 12px;border-radius:6px;border-left:3px solid #2563eb;margin:4px 0;">';
-        wrapBlueEnd = '</div>';
-      }
       // 先转义 HTML 实体
       var escaped = escapeHtml(text);
       // 将 Markdown 语法转换为 HTML 标签
@@ -125,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var trimmed = line.trim();
         if (!trimmed) {
           if (inList) { result += '</ul>'; inList = false; }
-          if (!hasDiscrepancy) result += '<br>';
+          result += '<br>';
           continue;
         }
         // 中文编号章节标题：一、市场发展现状（深蓝 h4）
@@ -164,10 +156,7 @@ document.addEventListener('DOMContentLoaded', function () {
         result += '<p style="margin:4px 0;line-height:1.8;">' + trimmed + '</p>';
       }
       if (inList) result += '</ul>';
-      // 如果有差异提示，包裹蓝色容器
-      if (hasDiscrepancy) {
-        result = wrapBlue + result + wrapBlueEnd;
-      }
+      // 普通文本渲染，无特殊着色
       return result;
     }
 
@@ -184,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       // 根据值类型渲染
       if (typeof value === 'string') {
-        html += '<div class="summary-text">' + renderMarkdown(value) + '</div>';
+        html += '<div class="summary-text" style="overflow-wrap:break-word;">' + renderMarkdown(value) + '</div>';
       } else if (Array.isArray(value)) {
         html += '<div class="references-list">';
         for (var vi = 0; vi < value.length; vi++) {
@@ -288,37 +277,136 @@ document.addEventListener('DOMContentLoaded', function () {
     };
   }
 
-  // ========== 追问功能 ==========
-  function injectFollowupBox(sessionId, reportEl) {
+  // ========== 气泡对话模式（取代追问框） ==========
+  function injectBubbleChat(sessionId, reportEl) {
     // 移除已有追问框
     var old = document.getElementById('followupBox');
     if (old) old.remove();
 
     if (!reportEl) return;
-    var box = document.createElement('div');
-    box.id = 'followupBox';
-    box.style.cssText = 'margin-top:16px;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border, #e5e7eb);';
-    box.innerHTML =
-      '<div style="font-weight:600;margin-bottom:8px;">💬 对该报告进行追问</div>' +
-      '<div style="display:flex;gap:8px;">' +
-      '<input id="followupInput" type="text" placeholder="追问：如"报告中提到的风险，有什么应对策略？"" autocomplete="off" style="flex:1;padding:8px 12px;border:1px solid var(--border,#d1d5db);border-radius:6px;font-size:14px;">' +
-      '<button id="followupBtn" style="padding:8px 16px;background:var(--primary,#2563eb);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">发送</button>' +
-      '</div>' +
-      '<div id="followupAnswer" style="margin-top:10px;font-size:14px;line-height:1.6;max-height:300px;overflow-y:auto;display:none;"></div>';
-    reportEl.parentNode.insertBefore(box, reportEl.nextSibling);
+
+    // 创建气泡对话容器
+    var chatContainer = document.createElement('div');
+    chatContainer.id = 'followupBox';
+    chatContainer.style.cssText = 'margin-top:16px;border:1px solid var(--border,#e5e7eb);border-radius:12px;overflow:hidden;background:var(--surface,#fff);box-shadow:0 1px 3px rgba(0,0,0,0.08);';
+
+    // ---- 头部 ----
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e5e7eb;';
+    header.innerHTML = '<span style="font-weight:600;font-size:14px;color:#1e293b;">💬 对话追问</span>' +
+      '<span style="font-size:12px;color:#94a3b8;" id="chatMsgCount">0 轮对话</span>';
+    chatContainer.appendChild(header);
+
+    // ---- 消息列表 ----
+    var msgList = document.createElement('div');
+    msgList.id = 'chatMessageList';
+    msgList.style.cssText = 'padding:16px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:#fafbfc;';
+    chatContainer.appendChild(msgList);
+
+    // ---- 输入区域 ----
+    var inputArea = document.createElement('div');
+    inputArea.style.cssText = 'display:flex;gap:8px;padding:12px 16px;border-top:1px solid #e5e7eb;background:#fff;';
+    inputArea.innerHTML =
+      '<input id="followupInput" type="text" placeholder="输入追问内容…" autocomplete="off" style="flex:1;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;transition:border-color 0.2s;">' +
+      '<button id="followupBtn" style="padding:10px 18px;background:var(--primary,#2563eb);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap;transition:background 0.2s;">发送</button>';
+    chatContainer.appendChild(inputArea);
+
+    // 插入到报告下方
+    reportEl.parentNode.insertBefore(chatContainer, reportEl.nextSibling);
 
     var input = document.getElementById('followupInput');
     var btn = document.getElementById('followupBtn');
-    var answerDiv = document.getElementById('followupAnswer');
+    var msgListEl = document.getElementById('chatMessageList');
 
+    // 公共的 Markdown 转换函数（避免重复）
+    function simpleMarkdown(text, linkColor) {
+      if (!text) return '';
+      linkColor = linkColor || '#2563eb';
+      var html = escapeHtml(text);
+      html = html.replace(/\`([^\`]+)\`/g, '<code style="background:#e2e8f0;padding:1px 4px;border-radius:3px;font-size:13px;">$1</code>');
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:' + linkColor + ';text-decoration:underline;">$1</a>');
+      html = html.replace(/\n/g, '<br>');
+      return html;
+    }
+
+    // 创建气泡消息
+    function createBubble(role, content, isStreaming) {
+      var div = document.createElement('div');
+      div.style.cssText = 'display:flex;' + (role === 'user' ? 'justify-content:flex-end;' : 'justify-content:flex-start;');
+      var bubble = document.createElement('div');
+      bubble.className = 'chat-bubble';
+      var isUser = role === 'user';
+      bubble.style.cssText =
+        'max-width:80%;padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.6;word-break:break-word;' +
+        (isUser
+          ? 'background:#2563eb;color:#fff;border-bottom-right-radius:4px;'
+          : 'background:#e8f0fe;color:#1e293b;border-bottom-left-radius:4px;');
+      // 如果是流式内容，使用 textContent 防止 XSS；否则用 innerHTML 支持基本格式
+      if (isStreaming) {
+        bubble.textContent = content;
+      } else {
+        bubble.innerHTML = simpleMarkdown(content, isUser ? '#bfdbfe' : '#2563eb');
+      }
+      div.appendChild(bubble);
+      return div;
+    }
+
+    // 加载历史对话
+    function loadConversationHistory() {
+      fetch('/api/v1/conversation/' + encodeURIComponent(sessionId))
+        .then(function(resp) {
+          if (!resp.ok) return null;
+          return resp.json();
+        })
+        .then(function(data) {
+          if (!data || !data.conversation) return;
+          var msgs = data.conversation;
+          var countEl = document.getElementById('chatMsgCount');
+          if (countEl) countEl.textContent = Math.ceil(msgs.length / 2) + ' 轮对话';
+          msgListEl.innerHTML = '';
+          for (var i = 0; i < msgs.length; i++) {
+            var msg = msgs[i];
+            if (msg.role === 'user' || msg.role === 'assistant') {
+              var bubble = createBubble(msg.role, msg.content);
+              msgListEl.appendChild(bubble);
+            }
+          }
+          msgListEl.scrollTop = msgListEl.scrollHeight;
+        })
+        .catch(function(e) {
+          console.warn('[MRA] 加载对话历史失败:', e);
+        });
+    }
+
+    // 发送追问
     async function sendFollowup() {
       var question = input.value.trim();
       if (!question) return;
       input.disabled = true;
       btn.disabled = true;
       btn.textContent = '...';
-      answerDiv.style.display = 'block';
-      answerDiv.innerHTML = '<span style="color:var(--muted);">⏳ 正在生成回答...</span>';
+
+      // 追加用户气泡
+      var userBubbleDiv = createBubble('user', question);
+      msgListEl.appendChild(userBubbleDiv);
+      msgListEl.scrollTop = msgListEl.scrollHeight;
+
+      // 创建助手气泡（占位，流式写入）
+      var assistantBubbleDiv = createBubble('assistant', '', true);
+      var assistantBubble = assistantBubbleDiv.querySelector('.chat-bubble');
+      msgListEl.appendChild(assistantBubbleDiv);
+      msgListEl.scrollTop = msgListEl.scrollHeight;
+
+      // 更新计数
+      var countEl = document.getElementById('chatMsgCount');
+      if (countEl) {
+        var currentCount = parseInt(countEl.textContent) || 0;
+        countEl.textContent = (currentCount + 1) + ' 轮对话';
+      }
+
+      input.value = '';
 
       try {
         var formData = new FormData();
@@ -350,30 +438,58 @@ document.addEventListener('DOMContentLoaded', function () {
               var evt = JSON.parse(line.substring(6));
               if (evt.text) {
                 accumulated += evt.text;
-                answerDiv.textContent = accumulated;
-                answerDiv.scrollTop = answerDiv.scrollHeight;
+                if (assistantBubble) {
+                  assistantBubble.textContent = accumulated;
+                }
+                msgListEl.scrollTop = msgListEl.scrollHeight;
               }
               if (evt.step === 'followup_done') {
-                answerDiv.textContent = evt.answer || accumulated;
+                // 最终内容用格式化版本替换
+                if (assistantBubble && evt.answer) {
+                  assistantBubble.innerHTML = simpleMarkdown(evt.answer, '#2563eb');
+                }
               }
               if (evt.step === 'error') {
-                answerDiv.innerHTML = '<span style="color:#ef4444;">❌ ' + escapeHtml(evt.msg || '未知') + '</span>';
+                if (assistantBubble) {
+                  assistantBubble.style.background = '#fee2e2';
+                  assistantBubble.style.color = '#dc2626';
+                  assistantBubble.innerHTML = '❌ ' + escapeHtml(evt.msg || '未知错误');
+                }
               }
             } catch(e) {}
           }
         }
+
+        // 更新计数
+        if (countEl) {
+          var totalMsgs = msgListEl.querySelectorAll('.chat-bubble').length;
+          countEl.textContent = Math.ceil(totalMsgs / 2) + ' 轮对话';
+        }
+
       } catch(e) {
-        answerDiv.innerHTML = '<span style="color:#ef4444;">❌ 追问失败: ' + escapeHtml(e.message) + '</span>';
+        if (assistantBubble) {
+          assistantBubble.style.background = '#fee2e2';
+          assistantBubble.style.color = '#dc2626';
+          assistantBubble.innerHTML = '❌ 追问失败: ' + escapeHtml(e.message);
+        }
       } finally {
         input.disabled = false;
         btn.disabled = false;
         btn.textContent = '发送';
-        input.value = '';
       }
     }
 
+    // 加载历史
+    loadConversationHistory();
+
+    // 绑定事件
     btn.addEventListener('click', sendFollowup);
     input.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendFollowup(); });
+    // 输入框焦点样式
+    input.addEventListener('focus', function() { this.style.borderColor = '#2563eb'; });
+    input.addEventListener('blur', function() { this.style.borderColor = '#d1d5db'; });
+    btn.addEventListener('mouseenter', function() { this.style.background = '#1d4ed8'; });
+    btn.addEventListener('mouseleave', function() { this.style.background = '#2563eb'; });
   }
 
   runBtn.addEventListener('click', async function () {
@@ -419,16 +535,35 @@ document.addEventListener('DOMContentLoaded', function () {
       var allStreamedText = '';
 
       var stepLabels = {
+        'planning_start': '📋 正在拆解调研需求...',
+        'planning_done': '✅ 规划完成',
         'ingestion_start': '📄 正在解析数据...',
         'ingestion_done': '✅ 数据解析完成',
         'retrieval_start': '🔍 正在检索相关素材...',
         'retrieval_done': '✅ 检索完成',
+        'subtask_retrieval': '🔍 执行子任务检索...',
+        'citation_metadata': '📝 已生成引用元数据',
+        'web_ingestion_start': '🌐 正在清洗网页切片...',
+        'web_ingestion_done': '✅ 网页入库完成',
+        'conflict_check_start': '🔎 正在检查多源数据一致性...',
+        'conflict_check_done': '✅ 冲突检测完成',
+        'validation_start': '✅ 正在校验素材一致性...',
+        'validation_done': '✅ 素材校验完成',
+        'supplement_retrieval_start': '🔍 素材不足，正在补充检索...',
+        'supplement_retrieval_done': '✅ 补充检索完成',
+        'supplement_retrieval_result': '📊 补充检索结果',
+        'supplement_retrieval_maxed': '⚠️ 补充检索已达上限',
         'analyst_start': '🧠 正在分析规划...',
         'analyst_streaming': '🧠 分析规划中...',
         'analyst_done': '✅ 大纲规划完成',
         'writer_start': '✍️ 正在撰写报告...',
         'writer_streaming': '✍️ 生成报告中...',
         'writer_done': '✅ 报告撰写完成',
+        'post_check_start': '🔎 正在执行后置段落校验...',
+        'post_check_done': '✅ 后置校验完成',
+        'number_rewrite_start': '✏️ 正在修正数字...',
+        'number_rewrite_done': '✅ 数字修正完成',
+        'manual_confirm': '📋 需人工确认数字问题',
         'pdf_generating': '📑 正在生成 PDF 报告...',
         'done': '🎉 全部分析完成！',
         'error': '❌ 出错了',
@@ -553,7 +688,7 @@ document.addEventListener('DOMContentLoaded', function () {
               var sid = event.session_id || '';
               if (sid) {
                 currentSessionId = sid;
-                injectFollowupBox(sid, reportDisplay);
+                injectBubbleChat(sid, reportDisplay);
               }
             }
           }
@@ -597,6 +732,28 @@ document.addEventListener('DOMContentLoaded', function () {
       runBtn.textContent = '🚀 开始分析';
     }
   });
+  // 自动初始化气泡对话（如果存在会话）
+  function tryAutoInitChat() {
+    fetch('/api/v1/conversation')
+      .then(function(resp) {
+        if (!resp.ok) return null;
+        return resp.json();
+      })
+      .then(function(data) {
+        if (!data || !data.conversations || data.conversations.length === 0) return;
+        var conv = data.conversations[0];
+        var sid = conv.session_id || conv.id;
+        if (sid) {
+          currentSessionId = sid;
+          injectBubbleChat(sid, reportDisplay);
+        }
+      })
+      .catch(function(e) {
+        console.warn('[MRA] 自动加载会话失败:', e);
+      });
+  }
+  tryAutoInitChat();
+
   console.log('[MRA] app.js loaded');
 });
 
