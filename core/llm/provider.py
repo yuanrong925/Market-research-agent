@@ -89,13 +89,20 @@ def _create_qwen_llm(temperature: float = 0.2, streaming: bool = False) -> BaseC
 #  Ollama 实现（本地）
 # ============================================================
 
-def _create_ollama_llm(temperature: float = 0.2, streaming: bool = False) -> BaseChatModel:
+def _create_ollama_llm(temperature: float = 0.2, streaming: bool = False, model_name: str = "") -> BaseChatModel:
     """创建本地 Ollama ChatOllama 实例"""
     from langchain_ollama import ChatOllama
 
     cfg = get_config()
     base_url = cfg.ollama_base_url or "http://localhost:11434"
-    model = cfg.ollama_model or "qwen:7b"
+
+    # 兼容用户配置了 /v1 后缀（OpenAI 兼容 API 路径，不是 Ollama 原生 API 路径）
+    # ChatOllama 内部构造路径为 {base_url}/api/chat，末尾多 /v1 会导致 404
+    if base_url.rstrip("/").endswith("/v1"):
+        logger.warning(f"   ⚠️ 检测到 OLLAMA_BASE_URL 末尾包含 /v1，自动移除: {base_url}")
+        base_url = base_url.rstrip("/").rstrip("v1").rstrip("/")
+
+    model = model_name or cfg.ollama_model or "qwen:7b"
 
     logger.info(
         f"   🏠 创建 Ollama LLM: model={model}, temperature={temperature}, streaming={streaming}, base_url={base_url}"
@@ -105,6 +112,7 @@ def _create_ollama_llm(temperature: float = 0.2, streaming: bool = False) -> Bas
         temperature=temperature,
         base_url=base_url,
         streaming=streaming,
+        format="json",
     )
 
 
@@ -117,17 +125,35 @@ def _create_llm(
     model_mode: str = "cloud",
     provider: str = "deepseek",
     streaming: bool = False,
+    model_name: str = "",
 ) -> BaseChatModel:
-    """根据 model_mode 和 provider 创建 LLM 实例"""
+    """根据 model_mode 和 provider 创建 LLM 实例（无静默兜底，配置不合法直接抛出异常）"""
     model_mode = model_mode.strip().lower()
+    provider = provider.strip().lower()
 
     if model_mode == "local":
-        return _create_ollama_llm(temperature=temperature, streaming=streaming)
+        # local 模式下强制使用 ollama provider
+        if provider != "ollama":
+            logger.warning(f"   ⚠️ local 模式下 provider 应为 ollama，当前为 {provider}，已自动修正为 ollama")
+            provider = "ollama"
+        return _create_ollama_llm(temperature=temperature, streaming=streaming, model_name=model_name)
 
-    if provider == "qwen":
-        return _create_qwen_llm(temperature=temperature, streaming=streaming)
+    if model_mode == "cloud":
+        if provider == "deepseek":
+            return _create_deepseek_llm(temperature=temperature, streaming=streaming)
+        if provider == "qwen":
+            return _create_qwen_llm(temperature=temperature, streaming=streaming)
+        raise ValueError(
+            f"不支持的云端 provider: '{provider}'。"
+            f" 支持的 provider: 'deepseek', 'qwen'。"
+            f" 请检查环境变量 LLM_PROVIDER 或调用时传入的 provider 参数。"
+        )
 
-    return _create_deepseek_llm(temperature=temperature, streaming=streaming)
+    raise ValueError(
+        f"不支持的 model_mode: '{model_mode}'。"
+        f" 支持的 mode: 'cloud', 'local'。"
+        f" 请检查环境变量 MODEL_MODE 或调用时传入的 model_mode 参数。"
+    )
 
 
 # ============================================================
@@ -138,12 +164,19 @@ def get_llm(
     temperature: float = 0.2,
     model_mode: Optional[str] = None,
     provider: str = "deepseek",
+    model_name: str = "",
 ) -> BaseChatModel:
     """获取 LLM 实例（全局缓存复用）"""
     cfg = get_config()
     model_mode = (model_mode or cfg.model_mode).strip().lower()
+    provider = provider.strip().lower()
 
-    cache_key = f"{model_mode}:{provider}:{temperature}"
+    # local 模式下强制使用 ollama provider
+    if model_mode == "local" and provider != "ollama":
+        logger.warning(f"[LLM] local 模式下 provider 应为 ollama，当前为 {provider}，已自动修正为 ollama")
+        provider = "ollama"
+
+    cache_key = f"{model_mode}:{provider}:{temperature}:{model_name}"
     if cache_key in _LLM_CACHE:
         logger.debug(f"[LLM] 缓存命中: {cache_key}")
         return _LLM_CACHE[cache_key]
@@ -153,9 +186,10 @@ def get_llm(
         model_mode=model_mode,
         provider=provider,
         streaming=False,
+        model_name=model_name,
     )
     _LLM_CACHE[cache_key] = instance
-    logger.info(f"[LLM] 创建新实例: mode={model_mode}, provider={provider}, temperature={temperature}")
+    logger.info(f"[LLM] 创建新实例: mode={model_mode}, provider={provider}, temperature={temperature}, model={model_name or 'default'}")
     return instance
 
 
@@ -167,12 +201,19 @@ def get_llm_streaming(
     temperature: float = 0.2,
     model_mode: Optional[str] = None,
     provider: str = "deepseek",
+    model_name: str = "",
 ) -> BaseChatModel:
     """获取支持流式输出的 LLM 实例（全局缓存复用）"""
     cfg = get_config()
     model_mode = (model_mode or cfg.model_mode).strip().lower()
+    provider = provider.strip().lower()
 
-    cache_key = f"{model_mode}:{provider}:{temperature}:streaming"
+    # local 模式下强制使用 ollama provider（与 get_llm 保持完全一致）
+    if model_mode == "local" and provider != "ollama":
+        logger.warning(f"[LLM] local 模式下 provider 应为 ollama，当前为 {provider}，已自动修正为 ollama")
+        provider = "ollama"
+
+    cache_key = f"{model_mode}:{provider}:{temperature}:streaming:{model_name}"
     if cache_key in _LLM_STREAMING_CACHE:
         logger.debug(f"[LLM] 流式缓存命中: {cache_key}")
         return _LLM_STREAMING_CACHE[cache_key]
@@ -182,9 +223,10 @@ def get_llm_streaming(
         model_mode=model_mode,
         provider=provider,
         streaming=True,
+        model_name=model_name,
     )
     _LLM_STREAMING_CACHE[cache_key] = instance
-    logger.info(f"[LLM] 创建新流式实例: mode={model_mode}, provider={provider}, temperature={temperature}")
+    logger.info(f"[LLM] 创建新流式实例: mode={model_mode}, provider={provider}, temperature={temperature}, model={model_name or 'default'}")
     return instance
 
 
@@ -207,6 +249,7 @@ def get_llm_with_fallback(
     temperature: float = 0.2,
     model_mode: Optional[str] = None,
     provider: str = "deepseek",
+    model_name: str = "",
 ) -> BaseChatModel:
     """获取 LLM 实例，local 失败时自动回退到 cloud"""
     cfg = get_config()
@@ -214,9 +257,9 @@ def get_llm_with_fallback(
 
     if model_mode == "local":
         try:
-            return get_llm(temperature=temperature, model_mode="local", provider="ollama")
+            return get_llm(temperature=temperature, model_mode="local", provider="ollama", model_name=model_name)
         except Exception as exc:
             logger.warning(f"[LLM] 本地模型失败，回退云端: {exc}")
             return get_llm(temperature=temperature, model_mode="cloud", provider=provider)
 
-    return get_llm(temperature=temperature, model_mode=model_mode, provider=provider)
+    return get_llm(temperature=temperature, model_mode=model_mode, provider=provider, model_name=model_name)

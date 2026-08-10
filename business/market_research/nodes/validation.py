@@ -30,7 +30,7 @@ _MAX_CHUNK_FOR_COMPARE = 2000
 # v2: 从 0.45 降至 0.10，仅过滤完全无关内容
 _MIN_RELEVANCE_SCORE = 0.10
 # 去重相似度阈值（高于此 → 视为重复，丢弃）
-_MAX_DEDUP_SIMILARITY = 0.92
+_MAX_DEDUP_SIMILARITY = 0.85
 
 # N-gram 重叠率最低阈值（低于此 → 失真）
 # v2.1: 从 0.30 降至 0.20，减少合法 web 切片误杀
@@ -47,7 +47,7 @@ def _normalize_text(text: str) -> str:
     """归一化文本"""
     text = text.lower()
     text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[，。！？、；：""''（）【】《》\-\n\r\t]', ' ', text)
+    text = re.sub(r'[-，。！？、；：""''（）【】《》\n\r\t]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -336,7 +336,7 @@ def chunk_validation_node(state: Dict[str, Any]) -> Dict[str, Any]:
     # ===== 构建 validation_summary（用于二次检索判断） =====
     passed_count = len(source_materials)
     missing_sub_tasks = []
-    if sub_tasks and passed_count < 5:
+    if sub_tasks and passed_count < 2:
         # 统计哪些子任务方向素材不足
         sub_task_texts = []
         for st in sub_tasks:
@@ -360,7 +360,7 @@ def chunk_validation_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "passed_count": passed_count,
         "total_count": len(top_k_chunks),
         "missing_sub_tasks": missing_sub_tasks,
-        "needs_retrieval": passed_count < 5 and len(missing_sub_tasks) > 0,
+        "needs_retrieval": passed_count < 2 and len(missing_sub_tasks) > 0,
     }
 
     logger.info(f"   [Validation] 校验完成: {stats['passed']} 通过, {stats['rejected']} 剔除 (Layer 1)")

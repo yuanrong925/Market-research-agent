@@ -33,6 +33,7 @@ class AgentState(TypedDict, total=False):
     #  模型配置
     # ============================================================
     model_mode: str                    # "cloud" | "local"
+    model_name: str                    # 具体模型名称（如 qwen2.5:7b，local 模式下生效）
 
     # ============================================================
     #  流程控制
@@ -71,6 +72,7 @@ def create_initial_state(task: str, **kwargs) -> AgentState:
         "research_results": [],
         "next_step": "",
         "model_mode": kwargs.get("model_mode", "cloud"),
+        "model_name": kwargs.get("model_name", ""),
         "web_search_used": False,
         "material_pool_frozen": False,
         "circuit_breaker_triggered": False,

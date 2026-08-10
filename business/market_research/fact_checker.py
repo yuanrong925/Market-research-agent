@@ -28,6 +28,7 @@ def fact_check_report(
     research_materials: str,
     model_mode: str = "cloud",
     pdf_only: bool = False,
+    model_name: str = "",
 ) -> Tuple[bool, List[Dict[str, str]]]:
     """
     事实核查 + 证据锚点验证（v3 单次 LLM 调用，不分块）
@@ -37,7 +38,7 @@ def fact_check_report(
     if not report.strip():
         return True, []
 
-    llm = get_llm(temperature=0.1, model_mode=model_mode)
+    llm = get_llm(temperature=0.1, model_mode=model_mode, model_name=model_name)
 
     # ===== 截断超长输入避免 token 超限 =====
     truncated_report = _truncate_text(report, 8000)
@@ -214,12 +215,13 @@ def rewrite_with_fixes(
     research_materials: str,
     model_mode: str = "cloud",
     pdf_only: bool = False,
+    model_name: str = "",
 ) -> str:
     """根据事实核查结果重写报告，丢弃无锚点的条目"""
     if not issues:
         return report
 
-    llm = get_llm(temperature=0.2, model_mode=model_mode)
+    llm = get_llm(temperature=0.2, model_mode=model_mode, model_name=model_name)
 
     # pdf_only 模式下追加强约束（使用全局常量）
     pdf_only_rule = PDF_ONLY_REWRITE_RULE if pdf_only else ""

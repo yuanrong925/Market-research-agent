@@ -14,12 +14,13 @@ def _llm_rerank_structured(
     query: str,
     candidates: List[Dict[str, Any]],
     model_mode: str,
+    model_name: str = "",
 ) -> List[Dict[str, Any]]:
     """
     使用 LLM 进行交叉编码深度重排序。
     一次性对所有候选片段做批量相关性判断，输出相关性标签。
     """
-    llm = get_llm(temperature=0.1, model_mode=model_mode)
+    llm = get_llm(temperature=0.1, model_mode=model_mode, model_name=model_name)
 
     candidate_lines = []
     for i, c in enumerate(candidates):
@@ -128,9 +129,10 @@ def _llm_rerank(
     query: str,
     candidates: List[Dict[str, Any]],
     model_mode: str,
+    model_name: str = "",
 ) -> List[Dict[str, Any]]:
     """使用 LLM 对候选条目进行相关度打分并排序"""
-    llm = get_llm(temperature=0.1, model_mode=model_mode)
+    llm = get_llm(temperature=0.1, model_mode=model_mode, model_name=model_name)
 
     candidate_lines = []
     for i, c in enumerate(candidates):

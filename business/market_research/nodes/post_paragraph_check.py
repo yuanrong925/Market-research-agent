@@ -288,9 +288,21 @@ def post_paragraph_check_node(state: AgentState) -> Dict[str, Any]:
     logger.info(f"🔍 [PostCheck] v3 开始后置数字校验 (重写次数: {rewrite_count})...")
     start_time = time.time()
 
-    # 检查报告是否有效
-    if not report or (isinstance(report, dict) and not report.get("标题", "")):
-        logger.warning("   [PostCheck] 报告为空或无效，跳过校验")
+    # 检查报告是否有效 — 不再依赖"标题"键，检查是否有实质文本内容
+    if not report:
+        logger.warning("   [PostCheck] 报告为空，跳过校验")
+        return {
+            "post_check_passed": True,
+            "post_check_results": [],
+            "post_check_rewrite_count": rewrite_count,
+            "post_check_meltdown": False,
+            "rewrite_scope": [],
+        }
+
+    report_str = json.dumps(report, ensure_ascii=False)
+    # 少于 20 个有效字符就算无效报告
+    if len(report_str.strip()) < 20 or report_str == "{}":
+        logger.warning(f"   [PostCheck] 报告内容过短({len(report_str)}字符)，视为无效，跳过校验")
         return {
             "post_check_passed": True,
             "post_check_results": [],

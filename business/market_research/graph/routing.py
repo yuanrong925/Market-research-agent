@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 GLOBAL_TIMEOUT_SECONDS = 300
 
 # 校验后二次检索：素材不足阈值
-_VALIDATION_MIN_PASSED = 5
+_VALIDATION_MIN_PASSED = 2
 # 最大二次检索轮次
 _MAX_VALIDATION_RETRY = 2
 

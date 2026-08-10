@@ -16,7 +16,11 @@ def extract_llm_content(response: Any) -> str:
 
 
 def extract_text_content(response: Any) -> str:
-    """从 LLM 响应中提取文本内容（兼容 AIMessage 嵌套）"""
+    """从 LLM 响应中提取文本内容（兼容 AIMessage 嵌套 + ChatGenerationChunk 流式 chunk）"""
+    # 兼容 ChatGenerationChunk（流式 chunk，文本在 .text 属性上）
+    if hasattr(response, 'text'):
+        return str(response.text)
+
     content = getattr(response, "content", response)
     if isinstance(content, list):
         parts = []

@@ -69,7 +69,7 @@ class AgentState(CoreAgentState, total=False):
     timeout_triggered: bool              # 全局超时是否触发
     partial_report: Any                  # 超时截断时的部分报告
     info_limitation_note: str            # 信息局限性说明
-    manual_confirm_flag: bool            # 标记【待人工确认】
+    manual_confirm_flag: bool            # 标记需人工确认的数据冲突
 
     # ============================================================
     #  【新增】信源溯源与冲突识别

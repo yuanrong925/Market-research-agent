@@ -57,7 +57,7 @@ QWEN_BASE_URL: str = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/
 QWEN_MODEL: str = os.getenv("QWEN_MODEL", "qwen-turbo")
 
 # Ollama（本地）
-OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_BASE_URL: str = "http://192.168.10.231:11434"
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen:7b")
 
 # DashScope Embedding（通义千问向量化）

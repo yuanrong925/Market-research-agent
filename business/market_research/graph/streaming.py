@@ -12,6 +12,7 @@ from typing import Any, AsyncGenerator, Dict
 from core.utils.logger import get_logger
 
 from business.market_research.state import AgentState
+from business.market_research.session_store import get_session
 from business.market_research.nodes import (
     plan_node,
     data_ingestion_node,
@@ -33,6 +34,7 @@ async def execute_streaming_workflow(
     pdf_path: str = "",
     model_mode: str = "cloud",
     manual_web_search_mode: str = "auto",
+    model_name: str = "",
     session_id: str = "",
 ) -> AsyncGenerator[str, None]:
     """
@@ -43,6 +45,7 @@ async def execute_streaming_workflow(
       pdf_path: PDF 文件路径（可选）
       model_mode: 模型模式（cloud/local）
       manual_web_search_mode: 搜索模式（auto/enabled/disabled）
+      model_name: 具体模型名称（local 模式下生效，如 qwen2.5:7b）
       session_id: 会话 ID（可选）
 
     生成:
@@ -52,6 +55,7 @@ async def execute_streaming_workflow(
     state: Dict[str, Any] = {
         "task": task,
         "model_mode": model_mode,
+        "model_name": model_name,
         "manual_web_search_mode": manual_web_search_mode,
         "pdf_path": pdf_path,
         "messages": [],
@@ -176,7 +180,7 @@ async def execute_streaming_workflow(
         if sub_tasks:
             current_sub = sub_tasks[0] if sub_tasks else {}
             retrieval_event = {
-                'step': 'retrieval_subtask',
+                'step': 'subtask_retrieval',
                 'msg': f'【执行子任务】正在检索：{current_sub.get("sub_query", "")[:60]}...',
                 'sub_task': current_sub.get('sub_query', ''),
                 'route_tag': current_sub.get('route_tag', ''),
@@ -191,7 +195,7 @@ async def execute_streaming_workflow(
             yield f"data: {json.dumps({'step': 'early_terminate', 'msg': term_msg, 'info_limitation_note': info_note})}\n\n"
             await asyncio.sleep(0.05)
             # 推送完成事件带空报告
-            yield f"data: {json.dumps({'step': 'done', 'msg': '⏹️ 分析已提前终止', 'session_id': session_id, 'report': {}, 'early_terminate': True, 'info_limitation_note': info_note})}\n\n"
+            yield f"data: {json.dumps({'step': 'early_terminate', 'msg': '⏹️ 分析已提前终止', 'session_id': session_id, 'report': {}, 'early_terminate': True, 'info_limitation_note': info_note})}\n\n"
             return
 
         # 推送引用元数据到前端（用于信源溯源可视化）
@@ -289,13 +293,13 @@ async def execute_streaming_workflow(
         while needs_retrieval and retrieval_retry_count < MAX_RETRIEVAL_RETRIES:
             retrieval_retry_count += 1
             missing_text = "、".join(missing_sub_tasks[:3])
-            logger.info(f"   [二次检索] 第 {retrieval_retry_count} 次: 素材不足 ({validation_summary.get('passed_count', 0)}/5)，缺少方向: {missing_text}")
-            yield f"data: {json.dumps({'step': 'secondary_retrieval_start', 'msg': f'🔍 素材不足，正在补充检索（第 {retrieval_retry_count} 次）...', 'missing_sub_tasks': missing_sub_tasks})}\n\n"
+            logger.info(f"   [二次检索] 第 {retrieval_retry_count} 次: 素材不足 ({validation_summary.get('passed_count', 0)}/2)，缺少方向: {missing_text}")
+            yield f"data: {json.dumps({'step': 'supplement_retrieval_start', 'msg': f'🔍 素材不足，正在补充检索（第 {retrieval_retry_count} 次）...', 'missing_sub_tasks': missing_sub_tasks})}\n\n"
             await asyncio.sleep(0.05)
 
             # 执行二次检索
             state.update(retrieval_node(state))
-            yield f"data: {json.dumps({'step': 'secondary_retrieval_done', 'msg': '✅ 补充检索完成，重新校验...'})}\n\n"
+            yield f"data: {json.dumps({'step': 'supplement_retrieval_done', 'msg': '✅ 补充检索完成，重新校验...'})}\n\n"
             await asyncio.sleep(0.05)
 
             # 重新校验
@@ -307,13 +311,13 @@ async def execute_streaming_workflow(
             missing_sub_tasks = validation_summary.get("missing_sub_tasks", [])
 
             passed_count = validation_summary.get("passed_count", 0)
-            yield f"data: {json.dumps({'step': 'secondary_retrieval_result', 'msg': f'二次检索后素材: {passed_count} 条通过', 'passed_count': passed_count, 'needs_retrieval': needs_retrieval})}\n\n"
+            yield f"data: {json.dumps({'step': 'supplement_retrieval_result', 'msg': f'二次检索后素材: {passed_count} 条通过', 'passed_count': passed_count, 'needs_retrieval': needs_retrieval})}\n\n"
             await asyncio.sleep(0.05)
 
         if needs_retrieval and retrieval_retry_count >= MAX_RETRIEVAL_RETRIES:
             logger.info(f"   [二次检索] 达到最大重试次数 ({MAX_RETRIEVAL_RETRIES})，使用现有素材继续")
             maxed_msg = f'⚠️ 已达到最大补充检索次数，使用现有 {validation_summary.get("passed_count", 0)} 条素材继续'
-            yield f"data: {json.dumps({'step': 'secondary_retrieval_maxed', 'msg': maxed_msg})}\n\n"
+            yield f"data: {json.dumps({'step': 'supplement_retrieval_maxed', 'msg': maxed_msg})}\n\n"
             await asyncio.sleep(0.05)
 
         # ============================================================
@@ -324,10 +328,10 @@ async def execute_streaming_workflow(
             # 捕获 analyst_done 事件中的结果
             if event.startswith("data: ") and '"step": "analyst_done"' in event:
                 try:
-                    data = json.loads(event[6:])
+                    data = json.loads(event[6:].strip())
                     state.update(data.get("result", {}))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"   [Streaming] 解析分析完成事件失败: {e}, event={event[:80]}")
 
         # ============================================================
         #  Stage 4: 写作（流式）
@@ -336,15 +340,18 @@ async def execute_streaming_workflow(
             yield event
             if event.startswith("data: ") and '"step": "writer_done"' in event:
                 try:
-                    data = json.loads(event[6:])
+                    data = json.loads(event[6:].strip())
                     result = data.get("result", {})
                     state["final_report"] = result.get("report", {})
                     state["citation_metadata"] = result.get("citation_metadata", [])
                     state["conflict_alerts"] = result.get("conflict_alerts", [])
                     state["references_section"] = result.get("references_section", "")
                     state["report_with_citations"] = result.get("report_with_citations", "")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"   [Streaming] 解析写作完成事件失败: {e}, event={event[:80]}")
+                    # 解析失败时置空报告，让下游 post_paragraph_check_node 的判空逻辑生效
+                    state["final_report"] = {}
+                    state["report_with_citations"] = "{}"
 
         # ============================================================
         #  Stage 4.5: 后置段落校验（写作后、事实核查前）
@@ -374,20 +381,20 @@ async def execute_streaming_workflow(
         if not post_check_passed and not post_check_meltdown:
             if issue_ratio > 30:
                 # 问题比例 > 30% → 执行1次数字修正
-                yield f"data: {json.dumps({'step': 'paragraph_rewrite_start', 'msg': '✏️ 问题比例 %.1f%% > 30%，正在执行数字修正...' % issue_ratio})}\n\n"
+                yield f"data: {json.dumps({'step': 'number_rewrite_start', 'msg': '✏️ 问题比例 %.1f%% > 30%，正在执行数字修正...' % issue_ratio})}\n\n"
                 await asyncio.sleep(0.05)
 
                 rewrite_result = paragraph_rewriter_node(state)
                 state.update(rewrite_result)
 
-                yield f"data: {json.dumps({'step': 'paragraph_rewrite_done', 'msg': '✅ 数字修正完成'})}\n\n"
+                yield f"data: {json.dumps({'step': 'number_rewrite_done', 'msg': '✅ 数字修正完成'})}\n\n"
                 await asyncio.sleep(0.05)
 
                 # 修正后直接结束
                 post_check_passed = True
             else:
                 # 问题比例 ≤ 30% → 直接输出，返回用户人工选择
-                yield f"data: {json.dumps({'step': 'post_check_user_confirm', 'msg': '📋 问题比例 %.1f%% (%d/%d) ≤ 30%，已原样输出，需人工确认' % (issue_ratio, issue_count, total_numbers)})}\n\n"
+                yield f"data: {json.dumps({'step': 'manual_confirm', 'msg': '📋 问题比例 %.1f%% (%d/%d) ≤ 30%，已原样输出，需人工确认' % (issue_ratio, issue_count, total_numbers)})}\n\n"
                 await asyncio.sleep(0.05)
 
                 state["manual_confirm_flag"] = True
@@ -417,6 +424,16 @@ async def execute_streaming_workflow(
                             sources_list.append(clean)
                 if sources_list:
                     final_report["信息来源附录"] = sources_list
+
+        # 将最终报告写入 session，供后续追问接口和 api.py 使用
+        try:
+            session = get_session(session_id)
+            if session:
+                session["final_report"] = final_report
+                session["web_search_used"] = state.get("web_search_used", False)
+        except Exception as e:
+            logger.warning(f"   [Streaming] 写入 session 失败: {e}")
+
         complete_event = {
             'step': 'done',
             'msg': '🎉 全部分析完成！',

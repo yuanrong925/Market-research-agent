@@ -74,9 +74,9 @@ def _prepare_material_with_citations(
 
     # 构建每条素材的引用信息（只从 source_materials 读取）
     for i, item in enumerate(source_materials):
-        text = item.get("text", "")
-        source_type = item.get("source_type", "unknown")
-        trust_tier = item.get("trust_tier", "unverified")
+        text = item.get("text", "") if isinstance(item, dict) else str(item)
+        source_type = item.get("source_type", "unknown") if isinstance(item, dict) else "unknown"
+        trust_tier = item.get("trust_tier", "unverified") if isinstance(item, dict) else "unverified"
 
         # 查找对应的引用元数据
         ref_id = f"S{i + 1}"
@@ -185,8 +185,8 @@ def writer_node(state: AgentState):
 
     # Step 2: 检测冲突（如果尚未检测，从 source_materials 中提取 PDF/Web 素材）
     if not conflict_alerts and len(source_materials) > 0:
-        pdf_materials = [c for c in source_materials if c.get("source_type") == "pdf"]
-        web_materials = [c for c in source_materials if c.get("source_type") == "web"]
+        pdf_materials = [c for c in source_materials if isinstance(c, dict) and c.get("source_type") == "pdf"]
+        web_materials = [c for c in source_materials if isinstance(c, dict) and c.get("source_type") == "web"]
         if pdf_materials and web_materials:
             conflict_alerts = detect_conflicts(pdf_materials, web_materials, citation_metadata, pdf_only=pdf_only)
             if conflict_alerts:
@@ -201,7 +201,7 @@ def writer_node(state: AgentState):
     outline_text = _build_outline_text(outline)
 
     # Step 5: 构建结构化提示
-    llm = get_llm(temperature=0.2, model_mode=model_mode)
+    llm = get_llm(temperature=0.2, model_mode=model_mode, model_name=state.get("model_name", ""))
     system_prompt = get_prompt("system_prompt", "writer.yaml")
 
     # 构建冲突上下文（如有）
@@ -230,7 +230,7 @@ def writer_node(state: AgentState):
                     f"- {c['label']}: "
                     f"PDF={c['pdf_value']}{c['pdf_unit']} (来源: {c.get('pdf_source', '内部文档')}) vs "
                     f"Web={c['web_value']}{c['web_unit']} (来源: {c.get('web_source', '公开网络')})\n"
-                    f"  差异率: {c['diff_ratio'] * 100:.1f}% 需标记【待人工确认】\n"
+                    f"  差异率: {c['diff_ratio'] * 100:.1f}%，两来源数据存在差异\n"
                 )
             logger.info(f"   📋 [Writer] 注入 {len(conflict_items)} 条数据冲突报告")
 
@@ -278,9 +278,14 @@ def writer_node(state: AgentState):
             start = content.find("{")
             end = content.rfind("}") + 1
             report = json.loads(content[start:end])
+        else:
+            # 没有花括号 → LLM 输出了非 JSON 格式文本，直接降级
+            logger.warning(f"   ⚠️ Writer 输出不含JSON，降级为文本报告")
+            report = {}
     except Exception as exc:
         logger.warning(f"   ⚠️ Writer 输出解析失败: {exc}")
-        report = {"标题": task, "摘要": "报告生成失败，请重试", "关键发现": []}
+        # 设为空字典，让下游 post_paragraph_check_node 的正确定空逻辑（not report / report_str == "{}"）生效
+        report = {}
 
     # Step 7: 生成参考文献清单
     references_section = generate_references_section(citation_metadata, pdf_only=pdf_only)
@@ -318,7 +323,7 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
     manual_mode = state.get("manual_web_search_mode", "auto").lower()
     pdf_only = manual_mode in ("disabled", "pdf_only")
 
-    yield f"data: {json.dumps({'step': 'writer_start', 'msg': '✍️ 开始撰写研报（只读 source_materials）...'})}\n\n"
+    yield f"data: {json.dumps({'step': 'writer_start', 'msg': '✍️ 正在撰写报告...'})}\n\n"
     await asyncio.sleep(0.05)
 
     # Step 1: 生成引用元数据
@@ -328,12 +333,12 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
 
     # Step 2: 检测冲突（从 source_materials 中提取 PDF/Web 素材）
     if not conflict_alerts and len(source_materials) > 0:
-        pdf_materials = [c for c in source_materials if c.get("source_type") == "pdf"]
-        web_materials = [c for c in source_materials if c.get("source_type") == "web"]
+        pdf_materials = [c for c in source_materials if isinstance(c, dict) and c.get("source_type") == "pdf"]
+        web_materials = [c for c in source_materials if isinstance(c, dict) and c.get("source_type") == "web"]
         if pdf_materials and web_materials:
             conflict_alerts = detect_conflicts(pdf_materials, web_materials, citation_metadata, pdf_only=pdf_only)
             if conflict_alerts:
-                yield f"data: {json.dumps({'step': 'writer_conflict', 'msg': f'⚠️ 检测到 {len(conflict_alerts)} 处信息冲突', 'conflict_alerts': conflict_alerts})}\n\n"
+                yield f"data: {json.dumps({'step': 'writer_conflict_detection', 'msg': f'⚠️ 检测到 {len(conflict_alerts)} 处信息冲突', 'conflict_alerts': conflict_alerts})}\n\n"
                 await asyncio.sleep(0.1)
 
     # Step 3: 构建素材文本（只从 source_materials 读取）
@@ -343,7 +348,7 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
     outline_text = _build_outline_text(outline)
 
     # Step 4: 流式调用 LLM
-    llm = get_llm_streaming(temperature=0.2, model_mode=model_mode)
+    llm = get_llm_streaming(temperature=0.2, model_mode=model_mode, model_name=state.get("model_name", ""))
     system_prompt = get_prompt("system_prompt", "writer.yaml")
 
     # 构建多源数据冲突报告（如有）
@@ -358,7 +363,7 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
                     f"- {c['label']}: "
                     f"PDF={c['pdf_value']}{c['pdf_unit']} vs "
                     f"Web={c['web_value']}{c['web_unit']} "
-                    f"(差异率: {c['diff_ratio'] * 100:.1f}% 需标记【待人工确认】)\n"
+                    f"(差异率: {c['diff_ratio'] * 100:.1f}%，两来源数据存在差异\n"
                 )
             logger.info(f"   📋 [Writer] 注入 {len(conflict_items)} 条数据冲突报告")
 
@@ -401,13 +406,67 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
 
     full_content = ""
     try:
-        async for chunk in llm.astream(prompt):
+        # 先获取异步迭代器（await 协程，拿到 AsyncIterator）
+        stream = llm.astream(prompt)
+        # 只对第一个 chunk 做超时检测（连接超时），后续流式正常迭代
+        first_chunk = await asyncio.wait_for(anext(stream), timeout=120)
+        text = extract_text_content(first_chunk)
+        if text:
+            full_content += text
+            yield f"data: {json.dumps({'step': 'writer_streaming', 'text': text})}\n\n"
+        else:
+            logger.debug(f"   [Writer] 首个 chunk 无文本内容: type={type(first_chunk).__name__}, chunk={str(first_chunk)[:200]}")
+
+        # 剩余 chunk 正常迭代（不设超时，避免阻塞 async for）
+        async for chunk in stream:
             text = extract_text_content(chunk)
             if text:
                 full_content += text
                 yield f"data: {json.dumps({'step': 'writer_streaming', 'text': text})}\n\n"
+            else:
+                logger.debug(f"   [Writer] 流式 chunk 无文本内容: type={type(chunk).__name__}, chunk={str(chunk)[:200]}")
+    except asyncio.TimeoutError:
+        error_msg = "Writer 流式调用超时（120秒），请检查 Ollama 模型状态或网络连接"
+        logger.error(f"   ⚠️ {error_msg}")
+        result = {
+            "report": {},
+            "citation_metadata": [],
+            "conflict_alerts": [],
+            "references_section": "",
+            "report_with_citations": "{}",
+        }
+        yield f"data: {json.dumps({'step': 'error', 'msg': error_msg})}\n\n"
+        yield f"data: {json.dumps({'step': 'writer_done', 'result': result}, ensure_ascii=False, default=str)}\n\n"
+        return
+    except StopAsyncIteration:
+        # 空流（完全没有 chunk），视为超时
+        error_msg = "Writer 流式调用返回空，Ollama 未产出任何内容"
+        logger.error(f"   ⚠️ {error_msg}")
+        result = {
+            "report": {},
+            "citation_metadata": [],
+            "conflict_alerts": [],
+            "references_section": "",
+            "report_with_citations": "{}",
+        }
+        yield f"data: {json.dumps({'step': 'error', 'msg': error_msg})}\n\n"
+        yield f"data: {json.dumps({'step': 'writer_done', 'result': result}, ensure_ascii=False, default=str)}\n\n"
+        return
     except Exception as e:
-        yield f"data: {json.dumps({'step': 'error', 'msg': f'Writer 写作失败: {str(e)}'})}\n\n"
+        error_msg = f"Writer 写作失败: {str(e)}"
+        logger.error(f"   ⚠️ {error_msg}")
+
+        # 生成空报告，让下游 post_paragraph_check_node 的判空逻辑生效，跳过校验
+        result = {
+            "report": {},
+            "citation_metadata": [],
+            "conflict_alerts": [],
+            "references_section": "",
+            "report_with_citations": "{}",
+        }
+
+        yield f"data: {json.dumps({'step': 'error', 'msg': error_msg})}\n\n"
+        yield f"data: {json.dumps({'step': 'writer_done', 'result': result}, ensure_ascii=False, default=str)}\n\n"
         return
 
     # Step 5: 解析结果
@@ -417,8 +476,11 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
             start = full_content.find("{")
             end = full_content.rfind("}") + 1
             report = json.loads(full_content[start:end])
+        else:
+            logger.warning(f"   ⚠️ Writer 流式输出不含JSON，降级为文本报告")
+            report = {}
     except Exception:
-        report = {"标题": task, "摘要": "报告生成失败，请重试", "关键发现": []}
+        report = {}
 
     # Step 6: 生成参考文献和冲突预警
     references_section = generate_references_section(citation_metadata, pdf_only=pdf_only)
@@ -432,4 +494,4 @@ async def streaming_writer_node(state: AgentState) -> AsyncGenerator[str, None]:
         "report_with_citations": json.dumps(report, ensure_ascii=False),
     }
 
-    yield f"data: {json.dumps({'step': 'writer_done', 'result': result})}\n\n"
+    yield f"data: {json.dumps({'step': 'writer_done', 'result': result}, ensure_ascii=False, default=str)}\n\n"

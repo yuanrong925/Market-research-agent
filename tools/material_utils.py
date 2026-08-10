@@ -271,11 +271,12 @@ def targeted_rewrite(
     issues: List[Dict[str, str]],
     research_materials: str,
     model_mode: str,
+    model_name: str = "",
 ) -> str:
     """定向重写：仅重写有问题的模块，保留其他模块不变。"""
     from tools.llm_utils import extract_llm_content
 
-    llm = get_llm(temperature=0.2, model_mode=model_mode)
+    llm = get_llm(temperature=0.2, model_mode=model_mode, model_name=model_name)
 
     critical_issues = [i for i in issues if i.get("impact") == "critical"]
     minor_issues = [i for i in issues if i.get("impact") == "minor"]

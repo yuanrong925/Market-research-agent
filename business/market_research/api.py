@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from core.llm.provider import get_llm, get_llm_streaming
 from core.utils.logger import get_logger
+from core.config import get_config
 
 from business.market_research.state import AgentState, create_initial_state
 from business.market_research.graph.graph import get_market_research_app as get_mr_graph
@@ -37,17 +38,74 @@ app = FastAPI(
 router = APIRouter(prefix="/api/v1", tags=["market-research"])
 
 
+# ============================================================
+#  辅助函数：将对话历史格式化为自然语言
+# ============================================================
+
+def format_conversation(conversation: list, max_messages: int = 10) -> str:
+    """将对话历史转为自然语言字符串，只保留最近 max_messages 条（约5轮对话）"""
+    if not conversation:
+        return "（暂无历史对话）"
+    recent = conversation[-max_messages:] if len(conversation) > max_messages else conversation
+    lines = []
+    for msg in recent:
+        role = "用户" if msg["role"] == "user" else "助手"
+        content = msg["content"].strip()
+        lines.append(f"{role}：{content}")
+    return "\n".join(lines)
+
+
 @router.get("/health")
 async def health_check():
     """健康检查"""
     return {"status": "ok", "service": "market-research-agent"}
 
 
+# ============================================================
+#  Ollama 模型管理接口
+# ============================================================
+
+@router.get("/ollama/models")
+async def list_ollama_models():
+    """从本地 Ollama 服务拉取可用模型列表"""
+    import httpx
+    cfg = get_config()
+    base_url = cfg.ollama_base_url or "http://localhost:11434"
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{base_url}/api/tags")
+            if resp.status_code == 200:
+                data = resp.json()
+                models = data.get("models", [])
+                result = []
+                for m in models:
+                    name = m.get("name", "")
+                    # 去掉 :latest 后缀
+                    if name.endswith(":latest"):
+                        name = name[:-7]
+                    result.append({
+                        "name": name,
+                        "size": m.get("size", 0),
+                        "modified": m.get("modified_at", ""),
+                    })
+                return {"models": result, "status": "ok"}
+            else:
+                return {"models": [], "status": "error", "message": f"Ollama 返回状态码 {resp.status_code}"}
+    except Exception as e:
+        logger.warning(f"拉取 Ollama 模型列表失败: {e}")
+        return {"models": [], "status": "error", "message": str(e)}
+
+
+# ============================================================
+#  市场调研核心接口
+# ============================================================
+
 @router.post("/research")
 async def run_research(
     task: str = Form(...),
     pdf_file: Optional[UploadFile] = File(None),
     model_mode: str = Form("cloud"),
+    model_name: str = Form(""),
     manual_web_search_mode: str = Form("auto"),
 ):
     """
@@ -57,6 +115,7 @@ async def run_research(
       task: 研究任务描述
       pdf_file: 上传的 PDF 文件（可选）
       model_mode: 模型模式（cloud/local）
+      model_name: 具体模型名称（如 qwen2.5:7b, local 模式下生效）
       manual_web_search_mode: 搜索模式（auto/enabled/disabled）
     """
     # 保存 PDF 文件
@@ -77,6 +136,7 @@ async def run_research(
         task=task,
         pdf_path=pdf_path,
         model_mode=model_mode,
+        model_name=model_name,
         manual_web_search_mode=manual_web_search_mode,
     )
 
@@ -106,6 +166,7 @@ async def run_research_stream(
     task: str = Form(...),
     pdf_file: Optional[UploadFile] = File(None),
     model_mode: str = Form("cloud"),
+    model_name: str = Form(""),
     manual_web_search_mode: str = Form("auto"),
 ):
     """
@@ -123,28 +184,16 @@ async def run_research_stream(
     session_id = create_session(task=task)
 
     async def event_stream():
-        # 推送每一步实时日志
+        # streaming.py 内部已包含 done 事件，这里只需要透传
         async for event in execute_streaming_workflow(
             task=task,
             pdf_path=pdf_path,
             model_mode=model_mode,
+            model_name=model_name,
             manual_web_search_mode=manual_web_search_mode,
             session_id=session_id,
         ):
             yield event
-        
-        # 流程全部跑完，推送携带完整报告的结束事件
-        # 读取当前会话存储的完整报告
-        session_info = get_session(session_id)
-        final_report = session_info.get("final_report", {})
-        # 构造前端识别的complete消息，SSE标准格式
-        complete_data = json.dumps({
-            "step": "complete",
-            "msg": "全部分析完成！",
-            "final_report": final_report,
-            "session_id": session_id,
-        }, ensure_ascii=False)
-        yield f"data: {complete_data}\n\n"
 
     return StreamingResponse(
         event_stream(),
@@ -161,6 +210,7 @@ async def run_research_stream(
 async def follow_up_question(
     session_id: str = Form(...),
     question: str = Form(...),
+    model_name: str = Form(""),
 ):
     """
     追问接口：基于已有会话上下文回答追问。
@@ -182,13 +232,16 @@ async def follow_up_question(
         "conversation": session["conversation"],
     }
 
+    # 将对话历史格式化为自然语言（最近5轮，最多10条）
+    history_text = format_conversation(context["conversation"])
+
     # 生成回答
-    llm = get_llm(temperature=0.2)
+    llm = get_llm(temperature=0.2, model_name=model_name)
     response = llm.invoke(
         f"基于以下上下文回答用户的问题。\n\n"
         f"原始任务：{context['task']}\n\n"
         f"已生成的报告摘要：{json.dumps(context['report'], ensure_ascii=False)[:2000]}\n\n"
-        f"对话历史：{json.dumps(context['conversation'][-5:], ensure_ascii=False)}\n\n"
+        f"对话历史：\n{history_text}\n\n"
         f"用户问题：{question}\n\n"
         f"请基于已有信息给出回答，如果信息不足，请说明。"
     )
@@ -214,6 +267,19 @@ async def get_session_info(session_id: str):
         "has_report": bool(session.get("final_report")),
         "conversation_count": len(session.get("conversation", [])),
         "web_search_used": session.get("web_search_used", False),
+    }
+
+
+@router.get("/conversation/{session_id}")
+async def get_conversation(session_id: str):
+    """获取会话对话历史"""
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+    return {
+        "session_id": session_id,
+        "conversation": session.get("conversation", []),
+        "count": len(session.get("conversation", [])),
     }
 
 
@@ -260,7 +326,7 @@ async def frontend_report_pdf(
     task: str = Form(...),
     report_text: str = Form(...),
 ):
-    """前端兼容：POST /api/report/pdf → 生成 PDF 下载（委托 agents/retrieval/pdf_report.py 生成）"""
+    """前端兼容：POST /api/report/pdf → 生成 PDF 下载"""
     try:
         report_data = json.loads(report_text)
     except json.JSONDecodeError:
@@ -294,21 +360,17 @@ async def frontend_followup_stream(
     session_id: str = Form(...),
     question: str = Form(...),
     model_mode: str = Form("cloud"),
+    model_name: str = Form(""),
 ):
     """
     前端兼容：POST /api/followup-stream → SSE 流式推送追问回答
-
-    前端期望 SSE 事件流（data: {text: "..."}），
-    这里必须返回 StreamingResponse，不能是普通 JSON。
     """
     session = get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在或已过期")
 
-    # 追加用户问题
     append_conversation(session_id, "user", question)
 
-    # 构建上下文（素材 + 历史报告 + 对话记录）
     context = {
         "task": session["task"],
         "report": session["final_report"],
@@ -316,15 +378,17 @@ async def frontend_followup_stream(
         "conversation": session["conversation"],
     }
 
+    # 将对话历史格式化为自然语言（最近5轮，最多10条）
+    history_text = format_conversation(context["conversation"])
+
     async def event_stream():
         try:
-            # 使用流式 LLM 实例
-            llm = get_llm_streaming(temperature=0.2, model_mode=model_mode)
+            llm = get_llm_streaming(temperature=0.2, model_mode=model_mode, model_name=model_name)
             prompt = (
                 f"基于以下上下文回答用户的问题。\n\n"
                 f"原始任务：{context['task']}\n\n"
                 f"已生成的报告摘要：{json.dumps(context['report'], ensure_ascii=False)[:2000]}\n\n"
-                f"对话历史：{json.dumps(context['conversation'][-5:], ensure_ascii=False)}\n\n"
+                f"对话历史：\n{history_text}\n\n"
                 f"用户问题：{question}\n\n"
                 f"请基于已有信息给出回答，如果信息不足，请说明。"
             )
@@ -337,10 +401,8 @@ async def frontend_followup_stream(
                     event_data = json.dumps({"text": token}, ensure_ascii=False)
                     yield f"data: {event_data}\n\n"
 
-            # 保存完整回答到会话
             append_conversation(session_id, "assistant", accumulated)
 
-            # 推送完成事件（前端解析 step === 'followup_done'）
             done_data = json.dumps({
                 "step": "followup_done",
                 "answer": accumulated,
