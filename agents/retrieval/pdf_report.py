@@ -292,9 +292,8 @@ def generate_pdf_report(report_json: Any, output_path: str) -> str:
             if y + lh > ph - mb - 5:
                 doc.new_page()
                 y = mt
-            # 用 clip 限制绘制区域，防止测量误差导致的溢出
-            clip_rect = fitz.Rect(x, y - size, x + usable_w + 5, y + size * 2)
-            doc[-1].insert_text((x, y), line, fontsize=size, fontname=fn, color=color, clip=clip_rect)
+            # clip 参数在 PyMuPDF 1.23.0+ 中已被移除，删除该参数
+            doc[-1].insert_text((x, y), line, fontsize=size, fontname=fn, color=color)
             y += lh
         return y
 

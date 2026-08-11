@@ -598,6 +598,34 @@ document.addEventListener('DOMContentLoaded', function () {
             streamOutput.scrollTop = streamOutput.scrollHeight;
           }
 
+          // 模式通知：告知用户当前生效的搜索模式（降级/忽略PDF等）
+          if (step === 'mode_notification' && event.notification) {
+            // 更新模式指示器
+            var modeIndicator = document.getElementById('modeIndicator');
+            if (modeIndicator) {
+              modeIndicator.textContent = event.mode_label || '🌐 模式已调整';
+              modeIndicator.style.background = event.mode_color || '#f59e0b';
+              modeIndicator.style.color = '#fff';
+            }
+            // 在流式输出区域显示通知
+            if (streamOutput) {
+              allStreamedText += '\n' + event.notification + '\n';
+              streamOutput.textContent = allStreamedText;
+              streamOutput.scrollTop = streamOutput.scrollHeight;
+            }
+            // 如果报告区域已存在，在上方创建一个通知横幅
+            if (reportDisplay) {
+              // 移除已有的通知横幅
+              var existingNotice = document.getElementById('modeNoticeBanner');
+              if (existingNotice) existingNotice.remove();
+              var noticeBanner = document.createElement('div');
+              noticeBanner.id = 'modeNoticeBanner';
+              noticeBanner.style.cssText = 'margin-bottom:12px;padding:12px 16px;border-radius:8px;font-size:13px;line-height:1.6;background:' + (event.mode_color || '#f59e0b') + '10;border:1px solid ' + (event.mode_color || '#f59e0b') + '40;color:' + (event.mode_color === '#2563eb' ? '#1e40af' : '#92400e') + ';';
+              noticeBanner.innerHTML = '🔔 ' + escapeHtml(event.notification);
+              reportDisplay.parentNode.insertBefore(noticeBanner, reportDisplay);
+            }
+          }
+
           // 检索完成通知（含 web_only 模式PDF忽略提示）
           if (step === 'retrieval_done' && event.notification && streamOutput) {
             allStreamedText += '\n📢 ' + event.notification + '\n';
@@ -700,6 +728,16 @@ document.addEventListener('DOMContentLoaded', function () {
               streamOutput.style.color = '#ef4444';
             }
             if (stepBar) stepBar.textContent = '❌ ' + (event.msg || '分析失败');
+            // 显示错误提示卡片（如果还未渲染报告）
+            if (reportDisplay && !reportDisplay.querySelector('.section-card')) {
+              reportDisplay.innerHTML = '<div class="empty-state" style="text-align:center;padding:40px;border:2px dashed #ef4444;border-radius:12px;">'
+                + '<div style="font-size:48px;margin-bottom:16px;">❌</div>'
+                + '<div style="font-size:18px;font-weight:600;color:#ef4444;margin-bottom:8px;">分析无法继续</div>'
+                + '<div style="font-size:14px;color:var(--muted);max-width:400px;margin:0 auto;">'
+                + escapeHtml(event.msg || '出错了，请检查输入后重试') + '</div>'
+                + '</div>';
+            }
+            if (streamOutput) streamOutput.style.display = 'none';
           }
 
           // 更新计划列表（用步骤标签作为计划进度）

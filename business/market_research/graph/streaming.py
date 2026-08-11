@@ -152,6 +152,74 @@ async def execute_streaming_workflow(
 
         await asyncio.sleep(0.1)
 
+        # ===== Mode notification for user awareness =====
+        # 根据用户选择的模式，向前端发送明确的模式提示，让用户知道当前生效的搜索模式
+        has_pdf = bool(state.get("pdf_path", ""))
+        manual_mode = state.get("manual_web_search_mode", "auto").lower()
+
+        # 场景1: PDF+联网模式 + 未上传PDF → 自动降级为纯联网
+        if manual_mode in ("auto", "pdf_web") and not has_pdf:
+            mode_notification = (
+                "📢 您选择了【PDF+联网】模式但未上传PDF文档，系统已自动降级为【纯联网】模式，"
+                "仅基于公开网络信息进行分析。如需上传文档，请重新发起请求时附上PDF文件。"
+            )
+            mode_event = {
+                'step': 'mode_notification',
+                'notification': mode_notification,
+                'mode': 'degraded_to_web_only',
+                'mode_label': '🔍 纯联网（自动降级）',
+                'mode_color': '#f59e0b',
+            }
+            yield f"data: {json.dumps(mode_event, ensure_ascii=False, default=str)}\n\n"
+            await asyncio.sleep(0.05)
+
+        # 场景2: 纯联网模式 + 上传了PDF → 告知用户已忽略PDF
+        elif manual_mode in ("enabled", "web_only") and has_pdf:
+            mode_notification = (
+                "📢 您选择了【纯联网】模式，系统已忽略上传的PDF文档，仅使用公开网络信息进行分析。"
+                "如需使用PDF内容，请切换至【PDF+联网】或【仅PDF】模式。"
+            )
+            mode_event = {
+                'step': 'mode_notification',
+                'notification': mode_notification,
+                'mode': 'web_only_ignored_pdf',
+                'mode_label': '🔍 纯联网（已忽略PDF）',
+                'mode_color': '#f59e0b',
+            }
+            yield f"data: {json.dumps(mode_event, ensure_ascii=False, default=str)}\n\n"
+            await asyncio.sleep(0.05)
+
+        # 场景3: 仅PDF模式 + 有PDF → 告诉用户正在使用仅PDF模式
+        elif manual_mode in ("disabled", "pdf_only") and has_pdf:
+            mode_notification = (
+                "📄 当前为【仅PDF】模式，仅基于上传的PDF文档进行分析，不会联网搜索。"
+            )
+            mode_event = {
+                'step': 'mode_notification',
+                'notification': mode_notification,
+                'mode': 'pdf_only',
+                'mode_label': '📄 仅PDF',
+                'mode_color': '#2563eb',
+            }
+            yield f"data: {json.dumps(mode_event, ensure_ascii=False, default=str)}\n\n"
+            await asyncio.sleep(0.05)
+
+        # 场景4: 仅PDF模式 + 未上传PDF → 后端已拦截，但需要通知前端更新模式指示器
+        if manual_mode in ("disabled", "pdf_only") and not has_pdf:
+            mode_notification = (
+                "📄 您选择了【仅PDF】模式，但未上传PDF文档。此模式必须上传PDF文件才能运行，"
+                "请上传PDF文档或切换至其他模式。"
+            )
+            mode_event = {
+                'step': 'mode_notification',
+                'notification': mode_notification,
+                'mode': 'pdf_only_no_pdf',
+                'mode_label': '❌ 仅PDF（缺少PDF文件）',
+                'mode_color': '#ef4444',
+            }
+            yield f"data: {json.dumps(mode_event, ensure_ascii=False, default=str)}\n\n"
+            await asyncio.sleep(0.05)
+
         if state.get("error_message"):
             yield f"data: {json.dumps({'step': 'error', 'msg': state['error_message']})}\n\n"
             return
