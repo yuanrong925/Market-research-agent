@@ -1,8 +1,20 @@
 "# 📊 Market Research Agent
 
 **基于 LLM 的全自动市场调研与研报生成系统**
+支持 PDF 本地知识库与 Tavily 联网搜索的深度融合，实现从需求拆解、多源检索、数据分析到结构化研报生成的全链路自动化。
 
-支持上传 PDF 资料 + 联网搜索，自动完成从**需求拆解 → 资料检索 → 数据分析 → 研报撰写 → 格式校验 → PDF 导出**的全流程。
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-teal.svg)
+
+---
+
+## ✨ 核心亮点 (Highlights)
+
+-   **🧠 真正的 Agent 工作流**：不仅仅是调用 API，而是利用 **LangGraph** 构建了包含规划、执行、反思、修正的完整闭环状态机。
+-   **⚡️ 实时流式响应 (SSE)**：后端采用 Server-Sent Events 技术，前端可实时看到 Agent 的思考过程（搜索了什么、分析了什么），拒绝黑盒等待。
+-   **📚 RAG + Search 双引擎**：独创的多源检索策略，自动融合本地 PDF 私有数据与 Tavily 联网公开数据，并进行去重与冲突检测。
+-   **🛡️ 事实一致性校验**：内置后置校验节点，自动核对生成报告中的数字与引用来源，大幅降低大模型幻觉。
 
 ---
 
@@ -22,6 +34,17 @@
 | 📑 **PDF 导出** | 一键下载带格式的 PDF 报告 |
 
 ## 🏗️ 项目结构
+```mermaid
+graph LR
+    A[用户输入] --> B(任务规划器)
+    B --> C{检索策略}
+    C -->|本地PDF| D[向量检索]
+    C -->|联网| E[Tavily搜索]
+    D --> F[多源数据融合]
+    E --> F
+    F --> G[深度分析节点]
+    G --> H[报告生成]
+```
 
 ```
 ├── app.py                     # 主入口（FastAPI 应用）
@@ -49,6 +72,8 @@
 ├── requirements.txt           # 依赖清单
 └── .env.example               # 环境变量模板
 ```
+
+<img width="838" height="518" alt="557967ab299495c08828101a4d6dafe1" src="https://github.com/user-attachments/assets/467fc0fd-0cb8-40ea-a211-cfef5c7b3a96" />
 
 ## 🚀 快速开始
 
@@ -118,6 +143,12 @@ uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 - **搜索引擎**: Tavily
 - **PDF 生成**: PyMuPDF
 - **流式通信**: Server-Sent Events (SSE)
+
+
+
+https://github.com/user-attachments/assets/0d6f7304-8d6e-4f95-bcd6-f53908813098
+
+
 
 ## 📝 许可证
 
